@@ -8,6 +8,9 @@ from fastapi.testclient import TestClient
 def _env(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "none")
     monkeypatch.setenv("STATE_BACKEND", "memory")
+    # auth fail-closed: los tests corren en modo local explícito (tests/test_auth.py cubre apigw)
+    monkeypatch.setenv("AUTH_MODE", "none")
+    monkeypatch.setenv("ALLOW_INSECURE_LOCAL", "1")
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "LLM_SECRET_ARN", "STATE_TABLE"):
         monkeypatch.delenv(key, raising=False)
 

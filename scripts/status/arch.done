@@ -1,0 +1,36 @@
+# arch — entrega (alineada con main a8f2720 + hallazgo de seguridad HIGH)
+
+## Archivos creados / modificados
+- docs/ARCHITECTURE.md — 5 diagramas Mermaid (componentes, secuencia /start+escalamiento+/resolve,
+  máquina de estados, permisos de tools, despliegue AWS con Cognito) + tablas de incertidumbre, permisos y auth.
+  Alineado con el código real: build_registry()/grant, Agent.tool → registry.call(agent, tool, state, **kw),
+  StepOutcome, TOOL_MAX_ATTEMPTS=2, FallbackLLM/build_llm (LLM_SECRET_ARN), build_store (STATE_BACKEND/STATE_TABLE),
+  proposals[] y conversation[], códigos 404/409 de resolve.
+- docs/adr/0001-decision-determinista-llm-redacta.md
+- docs/adr/0002-allowlist-tools-por-agente.md
+- docs/adr/0003-serverless-aws.md
+- docs/adr/0005-sin-ci-cd.md — sin GitHub Actions; deploy manual con --profile ecopacific; verify = gate obligatorio.
+- docs/adr/0004-autenticacion.md — Cognito + JWT authorizer, rutas explícitas, grupo compliance para /resolve.
+- infra/template.yaml — HttpApi $default (throttling, access logs, DefaultAuthorizer JWT Cognito),
+  UserPool + Client + grupo compliance, rutas explícitas (/health NONE; start/get/resolve con JWT),
+  Lambda py3.12 arm64 (CodeUri ../src, Handler onboarding.api.handler, BuildMethod python3.12, X-Ray),
+  env AUTH_MODE=apigw, STATE_BACKEND=dynamodb, STATE_TABLE, LLM_PROVIDER, LLM_SECRET_ARN, modelos;
+  DynamoDB PK onboarding_id (on-demand, PITR, SSE, Retain); GetSecretValue solo sobre LlmSecretArn (condicional);
+  LogGroups con retención + alarma Errors. Outputs: ApiUrl, UserPoolId, UserPoolClientId.
+- README.md — problema, arquitectura, local (uv), curl por escenario + resolve, deploy SAM, auth Cognito,
+  sesiones paralelas, seguridad de keys.
+
+## Cómo verificar (todo ejecutado y OK)
+- sam validate --lint -t infra/template.yaml   → valid SAM Template
+- sam build -t infra/template.yaml             → Build Succeeded
+- Mermaid: extraer bloques y `npx -y @mermaid-js/mermaid-cli@11.4.2 -i dN.mmd -o dN.svg` → 5/5 OK
+
+## Pendientes (fuera de mi alcance)
+- api.py: implementar AUTH_MODE=apigw → leer requestContext.authorizer.jwt.claims (Mangum: request.scope["aws.event"]),
+  exigir "compliance" en cognito:groups para /resolve (403) y registrar el usuario en audit. Hoy src no usa AUTH_MODE
+  ⇒ en AWS cualquier usuario autenticado podría resolver hasta que se implemente. Añadir test.
+- llm/client.py: timeout 20 s por proveedor (Claude + OpenAI = hasta 40 s) > límite 29–30 s de API Gateway/Lambda.
+  Recomendado bajar a ~8–10 s.
+- Mangum: considerar `Mangum(app, lifespan="off")`.
+- No se hizo sam deploy (manual por el usuario con --profile ecopacific; perfil personal con credenciales inválidas).
+- No se agregó CI/CD (decisión del usuario, ADR-0005).

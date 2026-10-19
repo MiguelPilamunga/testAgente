@@ -1,0 +1,223 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Agente Orquestador de Onboarding Digital — API Gateway (HTTP API) -> Lambda (FastAPI + Mangum)
+  -> DynamoDB. Keys LLM en Secrets Manager.
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+  LlmSecretArn:
+    Type: String
+    Default: ""
+    Description: >
+      ARN del secreto en Secrets Manager con JSON {"ANTHROPIC_API_KEY": "...", "OPENAI_API_KEY": "..."}.
+      Vacío = modo determinista (plantillas, sin LLM).
+  LlmProvider:
+    Type: String
+    Default: anthropic
+    AllowedValues: [anthropic, openai, none]
+  AnthropicModel:
+    Type: String
+    Default: claude-haiku-5-5
+  OpenAIModel:
+    Type: String
+    Default: gpt-5-mini
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+
+Conditions:
+  HasLlmSecret: !Not [!Equals [!Ref LlmSecretArn, ""]]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    MemorySize: 512
+    Timeout: 29
+    Tracing: Active
+
+Resources:
+  OnboardingHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      # $default => sin prefijo de stage en rawPath (las rutas FastAPI llegan tal cual vía Mangum)
+      StageName: $default
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","method":"$context.httpMethod","path":"$context.path","status":"$context.status","latency":"$context.responseLatency"}'
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 50
+        ThrottlingRateLimit: 20
+      # Toda ruta exige JWT de Cognito salvo las que declaren Authorizer: NONE (/health).
+      Auth:
+        DefaultAuthorizer: CognitoJwt
+        Authorizers:
+          CognitoJwt:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${OnboardingUserPool}
+              audience:
+                - !Ref OnboardingUserPoolClient
+
+  OnboardingUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub onboarding-${Stage}
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      MfaConfiguration: "OFF"
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+
+  OnboardingUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref OnboardingUserPool
+      ClientName: !Sub onboarding-channel-${Stage}
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+
+  # Oficiales de cumplimiento: únicos autorizados a /resolve (claim cognito:groups, verificado en la app).
+  ComplianceGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref OnboardingUserPool
+      GroupName: compliance
+      Description: Oficiales de cumplimiento que resuelven escalamientos
+
+  OnboardingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub onboarding-orchestrator-${Stage}
+      CodeUri: ../src
+      Handler: onboarding.api.handler
+      Description: Orquestador multi-agente de onboarding (FastAPI + Mangum)
+      LoggingConfig:
+        LogGroup: !Ref FunctionLogGroup
+      Environment:
+        Variables:
+          STATE_BACKEND: dynamodb
+          AUTH_MODE: apigw
+          STATE_TABLE: !Ref OnboardingStateTable
+          LLM_PROVIDER: !If [HasLlmSecret, !Ref LlmProvider, none]
+          LLM_SECRET_ARN: !Ref LlmSecretArn
+          ANTHROPIC_MODEL: !Ref AnthropicModel
+          OPENAI_MODEL: !Ref OpenAIModel
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OnboardingStateTable
+        - !If
+          - HasLlmSecret
+          - Version: "2012-10-17"
+            Statement:
+              - Sid: ReadLlmSecret
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref LlmSecretArn
+          - !Ref AWS::NoValue
+      Events:
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /health
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        Start:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /api/v1/onboarding/start
+            Method: POST
+        GetState:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /api/v1/onboarding/{onboarding_id}
+            Method: GET
+        Resolve:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref OnboardingHttpApi
+            Path: /api/v1/onboarding/{onboarding_id}/resolve
+            Method: POST
+    Metadata:
+      BuildMethod: python3.12
+
+  OnboardingStateTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub onboarding-state-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: onboarding_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: onboarding_id
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/onboarding-orchestrator-${Stage}
+      RetentionInDays: !Ref LogRetentionDays
+
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/http-api/onboarding-${Stage}
+      RetentionInDays: !Ref LogRetentionDays
+
+  FunctionErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Errores en la Lambda del orquestador de onboarding
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref OnboardingFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+Outputs:
+  ApiUrl:
+    Description: URL base de la API
+    Value: !Sub https://${OnboardingHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+  UserPoolId:
+    Value: !Ref OnboardingUserPool
+  UserPoolClientId:
+    Value: !Ref OnboardingUserPoolClient
+  FunctionName:
+    Value: !Ref OnboardingFunction
+  StateTableName:
+    Value: !Ref OnboardingStateTable

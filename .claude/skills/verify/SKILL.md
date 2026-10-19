@@ -17,7 +17,7 @@ Resultado: una tabla PASS/FAIL por paso y un veredicto único (VERDE solo si tod
 4. **Allowlist de tools** — `uv run pytest -q -k "allowlist or permitted or permission"`. Debe recolectar ≥1 test y pasar; si recolecta 0, es FAIL ("falta test de ToolNotPermittedError"). Si existe el registro, confirma además en vivo, p. ej. con `uv run python -c` invocando una tool ajena desde un agente (RiskAgent → `verify_identity`) y comprobando que lanza `ToolNotPermittedError` y deja evento en auditoría (SPEC § Tools y permisos).
 5. **Smoke de la API**:
    ```bash
-   LLM_PROVIDER=none uv run uvicorn onboarding.api:app --app-dir src --port 8099 >/tmp/verify-uvicorn.log 2>&1 &
+   LLM_PROVIDER=none AUTH_MODE=none ALLOW_INSECURE_LOCAL=1 uv run uvicorn onboarding.api:app --app-dir src --port 8099 >/tmp/verify-uvicorn.log 2>&1 &
    PID=$!; for i in $(seq 1 30); do curl -sf localhost:8099/health >/dev/null && break; sleep 0.5; done
    .claude/skills/verify/scripts/smoke.sh http://localhost:8099; RC=$?
    kill $PID

@@ -21,9 +21,27 @@ Ajustes a smoke.sh por el SPEC actualizado:
 - 0900000004: valida `required_documents` y `proposals` no vacíos.
 
 Cómo verificar:
-  LLM_PROVIDER=none uv run uvicorn onboarding.api:app --app-dir src --port 8099 &
+  LLM_PROVIDER=none AUTH_MODE=none ALLOW_INSECURE_LOCAL=1 uv run uvicorn onboarding.api:app --app-dir src --port 8099 &
   .claude/skills/verify/scripts/smoke.sh ; echo $?   # -> SMOKE: PASS, 0
   kill %1
 
 Pendientes:
-- Corregir C405 en tests/test_api.py:51 (dueño: tests/).
+- (C405 ya corregido por QA, integrado en 607267d)
+
+--- TAREA 2: defensa en profundidad /resolve (alcance ampliado por orquestador) ---
+Archivos: src/onboarding/auth.py (nuevo), src/onboarding/api.py (Depends require_compliance),
+          tests/test_auth.py (nuevo, 18 casos), tests/conftest.py (+AUTH_MODE=none, ALLOW_INSECURE_LOCAL=1),
+          .env.example (documenta ambas vars), .claude/skills/verify/SKILL.md (uvicorn con ambas vars).
+Comportamiento (fail-closed):
+- AUTH_MODE ausente => apigw. apigw: claims de scope["aws.event"].requestContext.authorizer.jwt.claims;
+  exige sub y "compliance" en cognito:groups (lista o "[g1 g2]"/"g1,g2"), si no 403.
+- AUTH_MODE=none solo con ALLOW_INSECURE_LOCAL=1 (exacto), si no 403. Otro valor => 500 "invalid AUTH_MODE".
+- Auditoría: evento api/officer_authenticated {escalation_id, sub} + notes prefijado "[officer:<sub>]"
+  (queda en escalation.resolution y conversation). Firma de orchestrator.resolve intacta (orchestrator.py no tocado).
+Gate:
+| uv sync   | PASS |
+| pytest    | 84 passed, 2 failed -> tests/test_llm_fallback.py (archivo nuevo de otra sesión, en curso con
+|           |      | agents/response.py; ajeno a auth). test_auth+test_api: 43 passed |
+| ruff      | PASS |
+| allowlist | PASS (7) |
+| smoke     | PASS 16/16 con AUTH_MODE=none ALLOW_INSECURE_LOCAL=1; sin flags => resolve 403 (fail-closed OK) |

@@ -1,6 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException
 from mangum import Mangum
 
+from onboarding.auth import Officer, require_compliance
 from onboarding.llm.client import build_llm
 from onboarding.models import OnboardingRequest, OnboardingState, ResolveRequest
 from onboarding.orchestrator import EscalationNotFound, EscalationNotOpen, Orchestrator
@@ -29,10 +32,17 @@ def get_state(onboarding_id: str) -> OnboardingState:
 
 
 @app.post("/api/v1/onboarding/{onboarding_id}/resolve", response_model=OnboardingState)
-def resolve(onboarding_id: str, body: ResolveRequest) -> OnboardingState:
+def resolve(
+    onboarding_id: str, body: ResolveRequest, officer: Annotated[Officer | None, Depends(require_compliance)]
+) -> OnboardingState:
     state = get_state(onboarding_id)
+    notes = body.notes
+    if officer:
+        # resolve() persiste el estado, así que este evento queda en la auditoría del escalamiento.
+        state.log("api", "officer_authenticated", escalation_id=body.escalation_id, sub=officer.sub)
+        notes = f"[officer:{officer.sub}] {notes}".strip()
     try:
-        return orchestrator.resolve(state, body.escalation_id, body.action, body.notes)
+        return orchestrator.resolve(state, body.escalation_id, body.action, notes)
     except EscalationNotFound:
         raise HTTPException(404, "escalamiento no encontrado") from None
     except EscalationNotOpen:
