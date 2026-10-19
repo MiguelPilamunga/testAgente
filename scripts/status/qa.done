@@ -18,9 +18,16 @@
                                riesgo high nunca auto-aprobado; approve en risk continúa desde documentation sin
                                re-ejecutar risk → APPROVED_WITH_CONDITIONS; decisión determinista + docs EDD.
 
+- tests/test_llm_fallback.py   (35) FallbackLLM: proveedor que lanza → usa el siguiente (last_provider correcto);
+                               respuesta vacía también cae; primero OK no llama al segundo; todos fallan → None y
+                               last_provider=="template"; ResponseAgent cae a su plantilla (auditado provider=template);
+                               build_llm con LLM_PROVIDER=none y sin keys → sin clientes; LLM fake que devuelve
+                               "APROBADO" no altera status/decision (REJECTED x2, ESCALATED, APPROVED_WITH_CONDITIONS),
+                               ni en memoria ni persistido.
+
 ## Verificación
-    uv run pytest -q          → 46 passed (estable en 3 corridas)
-    uv run ruff check tests   → All checks passed
+    uv run pytest -q          → 94 passed (suite completa, incl. test_auth.py de otra sesión)
+    uv run ruff check tests src/onboarding/agents → All checks passed
 
 ## Observaciones vs SPEC (no se tocó src/)
 - Durante la implementación en paralelo hubo un fallo transitorio en test_resolve_approve_resumes_to_approved
@@ -32,6 +39,22 @@
 - 0900000005 + resolve retry: el mock siempre falla, por lo que se agrega un 2º escalamiento OPEN (comportamiento
   esperado, documentado en el test).
 
+- GUARDRAIL implementado (alcance ampliado por el orquestador a src/onboarding/agents/response.py):
+  (a) customer_message siempre empieza con "Estado de tu solicitud: Aprobada | Aprobada con condiciones |
+      En revisión | No aprobada" (determinista según status);
+  (b) texto LLM descartado → plantilla + audit "llm_output_rejected" {provider, reason, status} si contradice la
+      decisión (REJECTED/ESCALATED con aprobad|approved|felicidades|bienvenid, ignorando negaciones "no fue
+      aprobada"; APPROVED* con rechaz|denegad|no aprobad|rejected). Normaliza tildes/mayúsculas;
+  (c) texto LLM > 800 chars (LLM_MAX_CHARS) → plantilla, reason "too_long".
+  message_generated registra provider="template" cuando se descarta el texto.
+- FUGA CERRADA (alcance ampliado por el orquestador a src/onboarding/agents/mitigation.py):
+  MitigationAgent separa propuesta al CLIENTE (proposals[] y escalation.proposal = SOLO texto del catálogo
+  MITIGATIONS) de la propuesta INTERNA para el oficial (state.steps[step]["internal_proposal"] = base + texto LLM
+  validado). El texto LLM se descarta (→ solo base + audit "llm_output_rejected" {provider, reason}) si tiene
+  términos de aprobación o > 800 chars. escalation.proposal se deja en base a propósito: en resolve "reject",
+  orchestrator.py:74 copia esc.proposal a proposals, así que llevar ahí texto LLM reabriría la fuga.
+  Contrato del SPEC sin cambios (internal_proposal vive dentro de steps, que es libre).
+  test_mitigation_llm_text_does_not_leak_into_rejection_message ya pasa (xfail retirado).
+
 ## Pendientes
-- Test del fallback LLM (anthropic → openai → plantilla) con clientes mockeados.
 - Test de DynamoDBStore (moto) y del handler Mangum (warning DeprecationWarning de asyncio en mangum).
