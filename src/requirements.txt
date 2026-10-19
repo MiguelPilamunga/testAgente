@@ -1,0 +1,5 @@
+fastapi>=0.115
+pydantic>=2.8
+mangum>=0.19
+anthropic>=0.40
+openai>=1.50

@@ -1,0 +1,7 @@
+Contexto: repo /Users/migueldev/Documents/technicaltest/onboarding-agent. Lee primero docs/SPEC.md (fuente de verdad, no la cambies). Trabajas en paralelo con otras sesiones de Claude Code coordinadas por un orquestador: NO hagas git commit ni toques archivos fuera de tu alcance. Paradigma ágil BMAD: entrega incremental, verificable. Tienes ~25 minutos. Al terminar escribe scripts/status/<tu-nombre>.done con: archivos creados, cómo verificarlos y pendientes. Responde en español.
+Tu nombre: qa. Alcance: SOLO tests/.
+Tarea: escribe la suite pytest contra el contrato de docs/SPEC.md (la implementación se está escribiendo en paralelo en src/onboarding; espera a que existan los módulos, revisa cada ~2 min con ls). Usa fastapi.testclient.TestClient sobre onboarding.api:app con LLM_PROVIDER=none (conftest.py: monkeypatch env, store en memoria fresco). Cubre:
+- tests/test_api.py: cada escenario de la tabla de document_id → status esperado; 422 para document_id inválido; producto inexistente → REJECTED con propuesta; GET devuelve estado; /resolve approve reanuda hasta APPROVED; resolve reject → REJECTED; resolve sobre escalamiento inexistente → 404/409.
+- tests/test_tool_permissions.py: ToolRegistry rechaza tool no permitida (ToolNotPermittedError) y queda en auditoría.
+- tests/test_orchestrator.py: reintento único ante error de tool (0900000005), propuestas presentes en todo escalamiento/rechazo.
+Si algo de la implementación contradice el SPEC, NO cambies src: anótalo en scripts/status/qa.done. Corre con: uv run pytest -q.
