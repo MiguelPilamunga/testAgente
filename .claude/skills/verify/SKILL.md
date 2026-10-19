@@ -26,6 +26,20 @@ Resultado: una tabla PASS/FAIL por paso y un veredicto único (VERDE solo si tod
 
 Corre todos los pasos aunque uno falle (salvo `uv sync`, que bloquea el resto), para que el reporte sea completo.
 
+## Verify remoto (AWS)
+
+Cuando el usuario pida verificar el despliegue, corre solo el smoke contra la URL de API Gateway (sin uvicorn local; los pasos 1–4 siguen siendo locales):
+
+```bash
+AUTH_TOKEN=<id/access token Cognito de un usuario del grupo compliance> \
+  .claude/skills/verify/scripts/smoke.sh https://<api-id>.execute-api.<region>.amazonaws.com
+```
+
+- `AUTH_TOKEN` se envía como `Authorization: Bearer …` en todo salvo `/health`. Pídeselo al usuario; nunca lo escribas en archivos ni lo muestres en el reporte.
+- Si `BASE_URL` no es localhost/127.0.0.1, el script añade el caso "start sin token → 401" (authorizer JWT): 17 casos en vez de 16.
+- Un token sin el grupo `compliance` hace fallar los dos casos de `resolve` con 403: es el comportamiento correcto de la app, no un bug; repórtalo así.
+- El smoke crea onboardings reales en DynamoDB (nombre "Smoke Test"); menciónalo en el reporte.
+
 ## Reporte
 
 ```

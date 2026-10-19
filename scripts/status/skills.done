@@ -45,3 +45,12 @@ Gate:
 | ruff      | PASS |
 | allowlist | PASS (7) |
 | smoke     | PASS 16/16 con AUTH_MODE=none ALLOW_INSECURE_LOCAL=1; sin flags => resolve 403 (fail-closed OK) |
+
+--- TAREA 3: verify remoto (alcance .claude/skills/verify/) ---
+- smoke.sh: AUTH_TOKEN opcional -> "Authorization: Bearer" en todo salvo /health. BASE_URL que no sea
+  localhost/127.0.0.1 => modo remoto: añade el caso "start sin token -> 401" (17 casos). Se quita la "/" final de BASE_URL.
+- Nota: no existía un escenario 403 local en el smoke (local usa AUTH_MODE=none); el local queda igual (16 casos).
+- SKILL.md: nueva sección "Verify remoto (AWS)" (token del grupo compliance, que no se persista, 403 en resolve
+  si falta el grupo, crea datos reales en DynamoDB).
+Pruebas: local sin token 16/16 rc=0 · local con AUTH_TOKEN 16/16 rc=0 · mock remoto (0.0.0.0, exige Bearer)
+         con token válido 17/17 rc=0 · con token inválido FAIL rc!=0.
