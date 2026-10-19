@@ -1,0 +1,10 @@
+# Documentación de negocio — Agente orquestador de onboarding
+
+Análisis de negocio (paradigma ágil BMAD: product brief + PRD + épicas) del caso de evaluación. El **enunciado del cliente es la fuente de verdad**; el contrato técnico vive en [`docs/SPEC.md`](../SPEC.md) y las decisiones de arquitectura en [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) y [`docs/adr/`](../adr/). Las referencias regulatorias (SB, UAFE, LOPDP) son de contexto y deben validarse con Cumplimiento/Legal.
+
+| Documento | Contenido |
+|---|---|
+| [01-problema.md](01-problema.md) | **Product brief.** Contexto del onboarding digital bancario y del marco KYC/AML ecuatoriano (SB, UAFE, listas OFAC/PEP, LOPDP, Registro Civil); actores (prospecto, canal digital, oficial de cumplimiento, sistema de agentes); el problema (lentitud, inconsistencia, poca trazabilidad, rechazos sin salida); objetivos medibles con contra-métricas (p. ej. 0 aprobaciones automáticas indebidas, 100 % de rechazos con propuesta); alcance dentro/fuera y riesgos de negocio con su mitigación. |
+| [02-requisitos.md](02-requisitos.md) | **PRD.** Requisitos de negocio (RN-01..07), funcionales (RF-01..12) y no funcionales (RNF-01..14: auditabilidad, explicabilidad, determinismo, seguridad, latencia, LOPDP, operación sin CI/CD), más las reglas de política POL-01..09 (umbral 0.8, `low`/`medium`/`high`, reintento, producto no ofertado). Cada uno trazado a un fragmento del enunciado (E-xx) o supuesto, con criterios Given/When/Then y estado de implementación. |
+| [03-epicas-historias.md](03-epicas-historias.md) | **Backlog.** 7 épicas y 24 historias en formato Como/Quiero/Para con criterios de aceptación, priorizadas MoSCoW y marcadas ✅/🟡/⬜ según el código actual. Lo pendiente relevante: bandeja de escalamientos, enmascarado de datos en auditoría, retención/TTL, consentimiento, idempotencia y métricas. |
+| [04-supuestos-y-preguntas.md](04-supuestos-y-preguntas.md) | **Glosario** (KYC, AML, PEP, OFAC, EDD, homonimia, UAFE, SB, LOPDP…), **supuestos** S-01..12, **ambigüedades** del enunciado A-01..11 con la resolución adoptada y **preguntas abiertas** P-01..12 para el negocio con dueño sugerido e impacto. |
