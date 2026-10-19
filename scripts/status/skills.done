@@ -1,0 +1,29 @@
+SESIÓN: skills — DONE (verify ejecutado contra la API real)
+
+Archivos (solo .claude/skills/):
+- .claude/skills/verify/SKILL.md          gate: uv sync, pytest, ruff, allowlist de tools, smoke API (LLM_PROVIDER=none), tabla PASS/FAIL
+- .claude/skills/verify/scripts/smoke.sh  (ejecutable) curl+jq; BASE_URL arg/env, default http://localhost:8099; exit!=0 si falla
+- .claude/skills/integrate/SKILL.md       secretos (sk-ant-/sk-proj-/AKIA) + .env ignorado, verify, merge --no-ff, Conventional Commits, docs/STATE.md, nunca push
+
+Resultado del gate verify contra la API real:
+| Paso      | Resultado | Detalle                                                        |
+|-----------|-----------|----------------------------------------------------------------|
+| uv sync   | PASS      |                                                                |
+| pytest    | PASS      | 46 passed, 1 warning                                           |
+| ruff      | FAIL      | 1 error: C405 en tests/test_api.py:51 set((...)) -> {...}      |
+| allowlist | PASS      | 7 tests (-k "allowlist or permitted or permission")            |
+| smoke     | PASS      | 16/16 (rc=0), uvicorn :8099 levantado y bajado                 |
+Veredicto: ROJO solo por ruff (fix trivial en tests/, fuera de mi alcance -> sesión QA:
+  `assert {"identity", "risk", "documentation"} <= set(body["steps"])`)
+
+Ajustes a smoke.sh por el SPEC actualizado:
+- 0900000001: valida `proposals[]` contiene "presencial" y `conversation` no vacío.
+- 0900000004: valida `required_documents` y `proposals` no vacíos.
+
+Cómo verificar:
+  LLM_PROVIDER=none uv run uvicorn onboarding.api:app --app-dir src --port 8099 &
+  .claude/skills/verify/scripts/smoke.sh ; echo $?   # -> SMOKE: PASS, 0
+  kill %1
+
+Pendientes:
+- Corregir C405 en tests/test_api.py:51 (dueño: tests/).
