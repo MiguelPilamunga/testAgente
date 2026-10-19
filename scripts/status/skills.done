@@ -54,3 +54,16 @@ Gate:
   si falta el grupo, crea datos reales en DynamoDB).
 Pruebas: local sin token 16/16 rc=0 · local con AUTH_TOKEN 16/16 rc=0 · mock remoto (0.0.0.0, exige Bearer)
          con token válido 17/17 rc=0 · con token inválido FAIL rc!=0.
+
+--- TAREA 4: métricas operativas (EMF) ---
+Archivos: src/onboarding/metrics.py (nuevo), tests/test_metrics.py (nuevo, 10 tests), docs/METRICAS.md (nuevo).
+Hooks (sin cambio de lógica): orchestrator.py (_run con RunMetrics + timing por paso, flush en finally;
+  resolve emite EscalationResolved/TimeToResolveSeconds; evento "escalated" lleva escalation_id),
+  response.py y mitigation.py (llm_flags en los eventos message_generated/proposal; _validated_extra devuelve
+  (texto, raw) en vez de guardar estado en la instancia, por concurrencia).
+Diseño: EMF a stdout, namespace OnboardingAgent; tools y LLM derivados del tramo de auditoría (sin hooks en
+  registry/client). METRICS_ENABLED=1/0; si no está, solo en Lambda (AWS_LAMBDA_FUNCTION_NAME) => conftest sin tocar.
+  Sin PII: Product fuera de catálogo => "unknown"; onboarding_id como propiedad no indexada.
+Gate: pytest 153 passed · ruff OK · allowlist 7 · smoke PASS con METRICS_ENABLED=1 (131 líneas EMF, 0 con PII).
+docs/METRICAS.md: catálogo + KPIs + 8 queries Logs Insights + dashboard JSON (8 widgets, validado) +
+  8 alarmas YAML (validado) para que arch las agregue a infra/template.yaml.

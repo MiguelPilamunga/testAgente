@@ -2,6 +2,7 @@ import re
 import unicodedata
 
 from onboarding.llm.client import FallbackLLM
+from onboarding.metrics import llm_flags
 from onboarding.models import OnboardingState, Status, mask_document_id
 from onboarding.policies import PRODUCTS
 
@@ -103,7 +104,8 @@ class ResponseAgent:
         facts = {"nombre": first_name(s), "producto": s.prospect.product, "estado": s.status.value,
                  "documentos_requeridos": s.required_documents,
                  "siguiente_paso_para_cliente": s.proposals[-1] if s.proposals else None}
-        body = self._validate(s, self.llm.complete(SYSTEM, scrub_pii(s, f"Hechos: {facts}")))
+        raw = self.llm.complete(SYSTEM, scrub_pii(s, f"Hechos: {facts}"))
+        body = self._validate(s, raw)
         provider = self.llm.last_provider if body else "template"
-        s.log(self.name, "message_generated", provider=provider)
+        s.log(self.name, "message_generated", provider=provider, **llm_flags(self.llm, raw, provider))
         return f"{self.status_line(s)}\n{body or self.template(s)}"

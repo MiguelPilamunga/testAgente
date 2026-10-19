@@ -1,4 +1,7 @@
 """Orquestador: máquina de estados que coordina sub-agentes, aplica políticas y pausa ante incertidumbre."""
+import time
+
+from onboarding import metrics
 from onboarding.agents.base import Agent, StepOutcome
 from onboarding.agents.documentation import DocumentationAgent
 from onboarding.agents.identity import IdentityAgent
@@ -66,6 +69,7 @@ class Orchestrator:
         esc.status, esc.resolution = "RESOLVED", f"{action}: {notes}".strip()
         state.conversation.append({"role": "officer", "content": f"{action} — {notes}"})
         state.log(self.name, "escalation_resolved", escalation_id=esc.id, action=action)
+        metrics.escalation_resolved(state, esc.id, esc.step, action)
         state.status = Status.IN_PROGRESS
         if action == "approve":
             state.steps.setdefault(esc.step, {})["manual_override"] = notes or "aprobado por oficial"
@@ -73,23 +77,31 @@ class Orchestrator:
         elif action == "reject":
             self._reject(state, f"Rechazado por oficial: {notes}".strip(), esc.proposal)
         # retry: current_step se mantiene y el paso se re-ejecuta
-        return self._run(state)
+        return self._run(state, source="resolve")
 
     # ---- motor -------------------------------------------------------------------------------------
-    def _run(self, state: OnboardingState) -> OnboardingState:
-        while state.current_step != "done":
-            step = state.current_step
-            if step in self.agents:
-                if not self._run_agent_step(state, step):
-                    break  # pausado por escalamiento
-            elif step == "decision":
-                self._decide(state)
-            elif step == "response":
-                self._respond(state)
-            if state.current_step == step:
-                state.current_step = STEPS[STEPS.index(step) + 1]
-        self.store.save(state)
-        return state
+    def _run(self, state: OnboardingState, source: str = "start") -> OnboardingState:
+        run = metrics.RunMetrics(state, source)
+        try:
+            while state.current_step != "done":
+                step = state.current_step
+                started = time.perf_counter()
+                try:
+                    if step in self.agents:
+                        if not self._run_agent_step(state, step):
+                            break  # pausado por escalamiento
+                    elif step == "decision":
+                        self._decide(state)
+                    elif step == "response":
+                        self._respond(state)
+                finally:
+                    run.step(step, started)
+                if state.current_step == step:
+                    state.current_step = STEPS[STEPS.index(step) + 1]
+            self.store.save(state)
+            return state
+        finally:
+            run.finish(state)  # también si una excepción (p. ej. ToolNotPermittedError) corta el flujo
 
     def _call_with_retry(self, state: OnboardingState, step: str) -> StepOutcome:
         agent = self.agents[step]
@@ -109,7 +121,8 @@ class Orchestrator:
         if out.escalation:
             state.escalations.append(self.mitigation.enrich(state, out.escalation))
             state.status = Status.ESCALATED
-            state.log(self.name, "escalated", step=step, reason=out.escalation.reason)
+            state.log(self.name, "escalated", step=step, reason=out.escalation.reason,
+                      escalation_id=state.escalations[-1].id)
             self._respond(state)
             return False
         if out.reject_reason:
