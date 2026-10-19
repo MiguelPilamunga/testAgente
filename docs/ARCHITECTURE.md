@@ -184,7 +184,7 @@ propuesta en `proposals[]` (RF3). Mientras corre, el estado interno es `IN_PROGR
 | Riesgo alto | `risk_level=high` / match OFAC | Nunca se aprueba automáticamente → escalamiento a Cumplimiento |
 | Riesgo medio | `risk_level=medium` / PEP | Apto con condiciones + documentos extra |
 | Servicio externo caído | `ToolError` en la tool | `TOOL_MAX_ATTEMPTS=2` (1 reintento, auditado `tool_error`); si persiste → escalamiento "servicio no disponible" con `retry` posible |
-| LLM no disponible / alucinación | error, timeout o sin keys | Fallback Claude → OpenAI → plantilla. El LLM **no** puede cambiar `status` ni `decision`: solo produce texto; la propuesta base sale del catálogo determinista |
+| LLM no disponible / lento / alucinación | error, timeout (`LLM_TIMEOUT`=6 s, sin reintentos del SDK), presupuesto agotado (`LLM_BUDGET`=15 s por ventana de 29 s) o sin keys | Fallback Claude → OpenAI → plantilla; peor caso ≈ presupuesto + 1 llamada < 29 s. El LLM **no** puede cambiar `status` ni `decision`: solo produce texto; la propuesta base sale del catálogo determinista |
 | Entrada inválida | Pydantic | 422 antes de tocar el orquestador |
 
 Todo evento (llamada a tool, denegación, reintento, escalamiento, resolución, decisión) queda en

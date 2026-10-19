@@ -34,3 +34,14 @@
 - Mangum: considerar `Mangum(app, lifespan="off")`.
 - No se hizo sam deploy (manual por el usuario con --profile ecopacific; perfil personal con credenciales inválidas).
 - No se agregó CI/CD (decisión del usuario, ADR-0005).
+
+## Iteración 2 — timeouts LLM (alcance ampliado: src/onboarding/llm/client.py, infra/template.yaml)
+- client.py: LLM_TIMEOUT (env, default 6 s) y max_retries=0 en Anthropic y OpenAI; FallbackLLM con presupuesto
+  LLM_BUDGET (15 s) en ventana deslizante LLM_BUDGET_WINDOW (29 s ≈ 1 petición; FallbackLLM es singleton en api.py,
+  así que no hay hook por petición sin tocar api/orchestrator). Agotado → plantilla. Reloj inyectable (`clock=`).
+  Env inválido → default.
+- template.yaml: Timeout 29, parámetros LlmTimeoutSeconds/LlmBudgetSeconds → env LLM_TIMEOUT/LLM_BUDGET.
+- Verificado: pytest tests/test_llm_fallback.py tests/test_api.py → 61 passed; ruff check OK; sam validate --lint OK;
+  prueba ad-hoc con reloj falso: 2 fallos de 6 s → 12 s; siguiente petición 1 llamada (18 s) y corta a plantilla.
+- Pendiente (QA, tests/): test de presupuesto agotado → plantilla, usando FallbackLLM(clients, clock=...).
+- Nota: `ruff format --check` marcaría el archivo (estilo previo); no reformateé para no generar diff ajeno.

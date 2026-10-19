@@ -25,6 +25,14 @@ Parameters:
   OpenAIModel:
     Type: String
     Default: gpt-5-mini
+  LlmTimeoutSeconds:
+    Type: String
+    Default: "6"
+    Description: Timeout por llamada LLM (sin reintentos del SDK)
+  LlmBudgetSeconds:
+    Type: String
+    Default: "15"
+    Description: Segundos máximos de LLM por petición antes de usar plantilla
   LogRetentionDays:
     Type: Number
     Default: 30
@@ -37,7 +45,7 @@ Globals:
     Runtime: python3.12
     Architectures: [arm64]
     MemorySize: 512
-    Timeout: 29
+    Timeout: 29 # = límite de integración de API Gateway; el LLM cabe por LLM_TIMEOUT + LLM_BUDGET
     Tracing: Active
 
 Resources:
@@ -119,6 +127,8 @@ Resources:
           STATE_TABLE: !Ref OnboardingStateTable
           LLM_PROVIDER: !If [HasLlmSecret, !Ref LlmProvider, none]
           LLM_SECRET_ARN: !Ref LlmSecretArn
+          LLM_TIMEOUT: !Ref LlmTimeoutSeconds
+          LLM_BUDGET: !Ref LlmBudgetSeconds
           ANTHROPIC_MODEL: !Ref AnthropicModel
           OPENAI_MODEL: !Ref OpenAIModel
       Policies:

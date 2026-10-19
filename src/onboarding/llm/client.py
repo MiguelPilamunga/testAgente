@@ -2,10 +2,27 @@
 import json
 import logging
 import os
+import time
+from collections import deque
+from collections.abc import Callable
 from functools import lru_cache
 from typing import Protocol
 
 log = logging.getLogger(__name__)
+
+
+def _float_env(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, default))
+    except ValueError:
+        return default
+
+
+# Una petición hace hasta 2 llamadas LLM (mitigación + respuesta) × 2 proveedores; con estos topes el peor caso
+# (presupuesto agotado + una llamada en curso) cabe en el timeout de 29 s de API Gateway/Lambda.
+LLM_TIMEOUT = _float_env("LLM_TIMEOUT", 6.0)  # por llamada, sin reintentos del SDK
+LLM_BUDGET = _float_env("LLM_BUDGET", 15.0)  # segundos de LLM permitidos dentro de la ventana
+LLM_BUDGET_WINDOW = _float_env("LLM_BUDGET_WINDOW", 29.0)  # ≈ duración máxima de una petición
 
 
 class LLMClient(Protocol):
@@ -36,7 +53,7 @@ class AnthropicClient:
     def __init__(self, api_key: str) -> None:
         import anthropic
 
-        self._c = anthropic.Anthropic(api_key=api_key, timeout=20)
+        self._c = anthropic.Anthropic(api_key=api_key, timeout=LLM_TIMEOUT, max_retries=0)
         self._model = os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5")
 
     def complete(self, system: str, prompt: str) -> str | None:
@@ -51,7 +68,7 @@ class OpenAIClient:
     def __init__(self, api_key: str) -> None:
         import openai
 
-        self._c = openai.OpenAI(api_key=api_key, timeout=20)
+        self._c = openai.OpenAI(api_key=api_key, timeout=LLM_TIMEOUT, max_retries=0)
         self._model = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 
     def complete(self, system: str, prompt: str) -> str | None:
@@ -61,14 +78,32 @@ class OpenAIClient:
 
 
 class FallbackLLM:
-    """Prueba cada proveedor en orden; devuelve None si todos fallan (el agente usa su plantilla)."""
+    """Prueba cada proveedor en orden; devuelve None si todos fallan (el agente usa su plantilla).
 
-    def __init__(self, clients: list[LLMClient]) -> None:
+    Presupuesto de latencia: si en la última ventana (`budget_window` s, ≈ una petición) ya se gastaron
+    `budget` s en llamadas LLM, no se llama a ningún proveedor y se va directo a plantilla.
+    """
+
+    def __init__(self, clients: list[LLMClient], budget: float = LLM_BUDGET,
+                 budget_window: float = LLM_BUDGET_WINDOW,
+                 clock: Callable[[], float] = time.monotonic) -> None:
         self.clients = clients
         self.last_provider = "template"
+        self.budget, self.budget_window, self._clock = budget, budget_window, clock
+        self._spent: deque[tuple[float, float]] = deque()  # (inicio, duración) de cada llamada
+
+    def spent(self) -> float:
+        cutoff = self._clock() - self.budget_window
+        while self._spent and self._spent[0][0] < cutoff:
+            self._spent.popleft()
+        return sum(d for _, d in self._spent)
 
     def complete(self, system: str, prompt: str) -> str | None:
         for c in self.clients:
+            if self.spent() >= self.budget:
+                log.warning("Presupuesto LLM agotado (%.1f s); se usa plantilla", self.budget)
+                break
+            start = self._clock()
             try:
                 out = c.complete(system, prompt)
                 if out:
@@ -76,6 +111,8 @@ class FallbackLLM:
                     return out
             except Exception as e:  # noqa: BLE001 — cualquier fallo del proveedor activa el fallback
                 log.warning("LLM %s falló: %s", c.name, e)
+            finally:
+                self._spent.append((start, self._clock() - start))
         self.last_provider = "template"
         return None
 
