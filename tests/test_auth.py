@@ -104,3 +104,26 @@ def test_auth_mode_invalido_da_500(orchestrator, monkeypatch):
 )
 def test_parse_groups(raw, expected):
     assert _parse_groups(raw) == expected
+
+
+@pytest.mark.parametrize("allow", ["1", None])
+def test_auth_mode_none_prohibido_en_lambda(orchestrator, monkeypatch, allow):
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "onboarding-agent-orchestrator")
+    monkeypatch.setenv("AUTH_MODE", "none")
+    if allow is None:
+        monkeypatch.delenv("ALLOW_INSECURE_LOCAL", raising=False)
+    else:
+        monkeypatch.setenv("ALLOW_INSECURE_LOCAL", allow)
+    client = _client_with_claims(None)
+    oid, eid = _escalated(client)
+    resp = _resolve(client, oid, eid)
+    assert resp.status_code == 500
+    assert orchestrator.get(oid).status == "ESCALATED"
+
+
+def test_apigw_en_lambda_sigue_funcionando(orchestrator, monkeypatch):
+    monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "onboarding-agent-orchestrator")
+    monkeypatch.setenv("AUTH_MODE", "apigw")
+    client = _client_with_claims({"sub": "officer-42", "cognito:groups": "[compliance]"})
+    oid, eid = _escalated(client)
+    assert _resolve(client, oid, eid).status_code == 200

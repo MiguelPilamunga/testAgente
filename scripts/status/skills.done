@@ -67,3 +67,10 @@ Diseño: EMF a stdout, namespace OnboardingAgent; tools y LLM derivados del tram
 Gate: pytest 153 passed · ruff OK · allowlist 7 · smoke PASS con METRICS_ENABLED=1 (131 líneas EMF, 0 con PII).
 docs/METRICAS.md: catálogo + KPIs + 8 queries Logs Insights + dashboard JSON (8 widgets, validado) +
   8 alarmas YAML (validado) para que arch las agregue a infra/template.yaml.
+
+--- TAREA 5: revisión IAM infra/bootstrap (solo lectura) ---
+Veredicto: APROBADO (sin camino a admin IAM). Sin ediciones en infra/.
+Pendiente de verificar con perfil admin: roles onboarding-agent-* sin boundary; stacks con RoleARN.
+HIGH: Cognito cognito-idp:* en userpool/* => lateral a otros pools. AWS Service Reference (cognito-idp.json):
+  userpool soporta aws:ResourceTag; CreateUserPool soporta aws:RequestTag/aws:TagKeys. Se envió política tag-scoped.
+No bloqueantes: Function URLs/AddPermission, tag-scope apigateway, Access Analyzer, guard ALLOW_INSECURE_LOCAL en Lambda.

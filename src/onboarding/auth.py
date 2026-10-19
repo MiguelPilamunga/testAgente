@@ -2,7 +2,8 @@
 
 El authorizer JWT de API Gateway ya valida el token; aquí se re-verifica la autorización con los
 claims que Mangum expone en `request.scope["aws.event"]`. Fail-closed: AUTH_MODE ausente equivale a
-`apigw`; `none` (local/tests) solo se acepta si además ALLOW_INSECURE_LOCAL=1.
+`apigw`; `none` (local/tests) solo se acepta si además ALLOW_INSECURE_LOCAL=1 y nunca dentro de Lambda
+(AWS_LAMBDA_FUNCTION_NAME), para que un cambio de variables de entorno no apague el check en AWS.
 """
 
 import os
@@ -36,6 +37,8 @@ def _claims(request: Request) -> dict:
 def require_compliance(request: Request) -> Officer | None:
     mode = os.getenv("AUTH_MODE", "apigw").strip().lower()
     if mode == "none":
+        if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+            raise HTTPException(500, "AUTH_MODE=none no está permitido en Lambda")
         if os.getenv("ALLOW_INSECURE_LOCAL") == "1":
             return None
         raise HTTPException(403, "AUTH_MODE=none requiere ALLOW_INSECURE_LOCAL=1")
