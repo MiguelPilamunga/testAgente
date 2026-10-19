@@ -33,6 +33,11 @@ Parameters:
     Type: String
     Default: "15"
     Description: Segundos máximos de LLM por petición antes de usar plantilla
+  StateTtlDays:
+    Type: Number
+    Default: 90
+    MinValue: 1
+    Description: Días de retención del expediente en DynamoDB tras su última actualización (TTL, LOPDP)
   LogRetentionDays:
     Type: Number
     Default: 30
@@ -125,6 +130,7 @@ Resources:
           STATE_BACKEND: dynamodb
           AUTH_MODE: apigw
           STATE_TABLE: !Ref OnboardingStateTable
+          STATE_TTL_DAYS: !Ref StateTtlDays
           LLM_PROVIDER: !If [HasLlmSecret, !Ref LlmProvider, none]
           LLM_SECRET_ARN: !Ref LlmSecretArn
           LLM_TIMEOUT: !Ref LlmTimeoutSeconds
@@ -190,6 +196,9 @@ Resources:
         PointInTimeRecoveryEnabled: true
       SSESpecification:
         SSEEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
 
   FunctionLogGroup:
     Type: AWS::Logs::LogGroup

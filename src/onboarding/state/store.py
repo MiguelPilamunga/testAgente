@@ -1,5 +1,6 @@
 """Persistencia del estado conversacional entre pasos: memoria (local/tests) o DynamoDB (AWS)."""
 import os
+import time
 from typing import Protocol
 
 from onboarding.models import OnboardingState
@@ -23,7 +24,17 @@ class InMemoryStore:
         self._data[state.onboarding_id] = state.model_dump_json()
 
 
+def state_ttl_days() -> int:
+    try:
+        return int(os.getenv("STATE_TTL_DAYS", "90"))
+    except ValueError:
+        return 90
+
+
 class DynamoDBStore:
+    """`expires_at` (epoch s) alimenta el TTL de DynamoDB (LOPDP RNF-11): el expediente se elimina
+    STATE_TTL_DAYS después de su última actualización."""
+
     def __init__(self, table: str) -> None:
         import boto3
 
@@ -35,7 +46,8 @@ class DynamoDBStore:
 
     def save(self, state: OnboardingState) -> None:
         self._t.put_item(Item={"onboarding_id": state.onboarding_id, "status": state.status.value,
-                               "state": state.model_dump_json(), "updated_at": state.updated_at})
+                               "state": state.model_dump_json(), "updated_at": state.updated_at,
+                               "expires_at": int(time.time()) + state_ttl_days() * 86400})
 
 
 def build_store() -> StateStore:

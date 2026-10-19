@@ -45,3 +45,12 @@
   prueba ad-hoc con reloj falso: 2 fallos de 6 s → 12 s; siguiente petición 1 llamada (18 s) y corta a plantilla.
 - Pendiente (QA, tests/): test de presupuesto agotado → plantilla, usando FallbackLLM(clients, clock=...).
 - Nota: `ruff format --check` marcaría el archivo (estilo previo); no reformateé para no generar diff ajeno.
+
+## Iteración 3 — LOPDP RNF-09/RNF-11 (alcance: models.py, state/store.py, infra, docs/adr, tests/test_privacy.py)
+- models.py: mask_pii/mask_document_id/mask_name; OnboardingState.log enmascara detail recursivamente
+  (document_id → ******5678; name/prospect_name → iniciales). state.prospect intacto.
+- store.py: DynamoDBStore.save añade expires_at = now + STATE_TTL_DAYS*86400 (default 90; valor inválido → 90).
+- template.yaml: parámetro StateTtlDays → env STATE_TTL_DAYS; TimeToLiveSpecification sobre expires_at.
+- docs/adr/0006-privacidad-y-retencion.md; nota en ARCHITECTURE §5.
+- Verificado: uv run pytest -q → 126 passed; ruff check src tests OK; sam validate --lint OK.
+- Pendiente: prompts al LLM aún pueden incluir nombre completo (agents/ fuera de alcance).

@@ -12,6 +12,32 @@ def now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+# LOPDP (RNF-09, minimización): la auditoría no guarda cédula ni nombre completos; el dato operativo
+# sigue en OnboardingState.prospect.
+_ID_KEYS = {"document_id"}
+_NAME_KEYS = {"name", "prospect_name"}
+
+
+def mask_document_id(value: str) -> str:
+    return "*" * max(len(value) - 4, 0) + value[-4:]
+
+
+def mask_name(value: str) -> str:
+    return " ".join(f"{w[0].upper()}." for w in value.split())
+
+
+def mask_pii(value: Any, key: str | None = None) -> Any:
+    if isinstance(value, dict):
+        return {k: mask_pii(v, k) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [mask_pii(v) for v in value]
+    if isinstance(value, str) and key in _ID_KEYS:
+        return mask_document_id(value)
+    if isinstance(value, str) and key in _NAME_KEYS:
+        return mask_name(value)
+    return value
+
+
 class Status(StrEnum):
     IN_PROGRESS = "IN_PROGRESS"
     APPROVED = "APPROVED"
@@ -74,7 +100,7 @@ class OnboardingState(BaseModel):
     updated_at: str = Field(default_factory=now)
 
     def log(self, agent: str, event: str, **detail: Any) -> None:
-        self.audit.append(AuditEvent(agent=agent, event=event, detail=detail))
+        self.audit.append(AuditEvent(agent=agent, event=event, detail=mask_pii(detail)))
         self.updated_at = now()
 
     def open_escalation(self) -> Escalation | None:

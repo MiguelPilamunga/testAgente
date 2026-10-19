@@ -189,6 +189,8 @@ propuesta en `proposals[]` (RF3). Mientras corre, el estado interno es `IN_PROGR
 
 Todo evento (llamada a tool, denegación, reintento, escalamiento, resolución, decisión) queda en
 `audit[]` con `ts`, `agent`, `event`, `detail`; el diálogo cliente/banco/oficial queda en `conversation[]`.
+Por LOPDP ([ADR-0006](adr/0006-privacidad-y-retencion.md)) `detail` enmascara cédula (`******5678`) y
+nombres (iniciales); el expediente en DynamoDB expira por TTL (`expires_at`, `STATE_TTL_DAYS`=90).
 
 ## 6. Permisos de tools
 
