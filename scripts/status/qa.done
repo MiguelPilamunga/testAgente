@@ -92,6 +92,10 @@
 - Evidencia: infra/bootstrap/get-token.sh aún no existe (arch); el README asume que imprime solo el ID token.
   Al correr contra AWS no publicar el reporte JSON de newman (incluye el header Authorization resuelto).
 
+- AWS (75e1a68, https://o8pjot00p9.execute-api.us-east-1.amazonaws.com): newman 28/28 requests, 145/145 assertions,
+  0 fallos; B2 canal→resolve 403 ejecutado; p50 161 ms, p95 241 ms, máx 320 ms (/health, arranque en frío).
+  Reporte: docs/evidencia/newman-aws-junit.xml (solo cli+junit). Tokens vía get-token.sh en variables de shell,
+  sin imprimir. Escaneo eyJ en docs/ postman/ scripts/ tests/: limpio.
+
 ## Pendientes
-- Correr la colección contra AWS cuando arch despliegue (newman-aws-junit.xml).
 - Test de DynamoDBStore (moto) y del handler Mangum (warning DeprecationWarning de asyncio en mangum).

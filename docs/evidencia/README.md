@@ -7,6 +7,7 @@ Fecha de ejecución: 2026-10-19 · commit base `1241670` · fuente de verdad: [`
 | Suite | Herramienta | Resultado |
 |---|---|---|
 | E2E contrato HTTP (local) | Postman Collection v2.1 + newman 6 | **27/27 requests OK, 143/143 assertions OK, 0 fallos** (1 request solo-AWS saltada a propósito) |
+| E2E contrato HTTP (**AWS**, 2026-10-19, `75e1a68`) | misma colección + newman 6, tokens Cognito reales | **28/28 requests OK, 145/145 assertions OK, 0 fallos**; incluye el 403 de resolve con token del canal |
 | Unitarios + integración | pytest | **143 passed, 0 failed** |
 
 ## Archivos
@@ -75,6 +76,22 @@ npx -y newman@6 run postman/onboarding-agent.postman_collection.json \
 > Pasa los tokens con `--env-var`, nunca editándolos en `aws.postman_environment.json`. El reporter JSON de newman guarda los headers enviados (incluido `Authorization`), así que **no publiques un `newman-aws.json`** sin quitar los tokens. El ejemplo usa solo `cli` y `junit`. En Postman Desktop, importa la colección y el entorno, y escribe los tokens en *Current value*.
 >
 > Contra AWS el estado persiste en DynamoDB y el LLM puede estar activo: las assertions dependen solo de la decisión determinista y de la línea de estado, no del texto que redacta el LLM.
+
+## Resultado contra AWS
+
+Ejecución: 2026-10-19 sobre `https://o8pjot00p9.execute-api.us-east-1.amazonaws.com` (API Gateway HTTP API → Lambda → DynamoDB), commit `75e1a68`. Los tokens se obtuvieron con `infra/bootstrap/get-token.sh canal|oficial` y se pasaron con `--env-var`; nunca se imprimieron ni se escribieron a disco. Reporte: [`newman-aws-junit.xml`](newman-aws-junit.xml), sin JSON ni HTML, a propósito.
+
+| Métrica | Valor |
+|---|---|
+| Requests ejecutadas / fallidas | 28 / 0 |
+| Assertions ejecutadas / fallidas | 145 / 0 |
+| Códigos HTTP | 200 ×20 · 422 ×4 · 404 ×2 · 409 ×1 · **403 ×1** |
+| Latencia p50 / p95 / máx | **161 ms** / 241 ms / **320 ms** (mín 109 ms) |
+| Duración total de la corrida | 5.6 s |
+
+- **B2 (resolve con `token_channel` → 403): ejecutado y OK.** El token del canal digital es un JWT válido, pero el usuario no pertenece al grupo `compliance`, así que `/resolve` lo rechaza. Con `token_officer`, los resolve approve/reject/retry responden 200.
+- La latencia máxima (320 ms) corresponde a `GET /health`, la primera request de la corrida, y probablemente incluye el arranque en frío de la Lambda. Ninguna request se acerca al límite de 29 s.
+- Las latencias de ~160 ms sugieren que en esta corrida la respuesta salió de la plantilla y no de un proveedor LLM. No lo verifiqué: el reporte JUnit no incluye el `provider` de la auditoría. Las assertions no dependen del texto que redacta el LLM.
 
 ## Unitarios e integración (pytest)
 
