@@ -123,7 +123,22 @@
     {
       "Sid": "DynamoDB",
       "Effect": "Allow",
-      "Action": "dynamodb:*",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:UpdateTable",
+        "dynamodb:DeleteTable",
+        "dynamodb:UpdateTimeToLive",
+        "dynamodb:UpdateContinuousBackups",
+        "dynamodb:TagResource",
+        "dynamodb:UntagResource",
+        "dynamodb:DescribeTable",
+        "dynamodb:DescribeTimeToLive",
+        "dynamodb:DescribeContinuousBackups",
+        "dynamodb:DescribeContributorInsights",
+        "dynamodb:DescribeKinesisStreamingDestination",
+        "dynamodb:ListTagsOfResource",
+        "dynamodb:GetResourcePolicy"
+      ],
       "Resource": "arn:aws:dynamodb:us-east-1:774305616818:table/onboarding-agent-*"
     },
     {
@@ -225,7 +240,6 @@
         "sns:CreateTopic",
         "sns:DeleteTopic",
         "sns:GetTopicAttributes",
-        "sns:SetTopicAttributes",
         "sns:Subscribe",
         "sns:Unsubscribe",
         "sns:ListSubscriptionsByTopic",

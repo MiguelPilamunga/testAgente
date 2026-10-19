@@ -92,3 +92,10 @@
 - Update → UPDATE_COMPLETE. El rol antiguo de SAM quedó huérfano por el Deny y se borró con root, tras verificar
   que la Lambda usa el rol nuevo.
 - Smoke remoto con token de oficial: PASS (17/17). Canal → resolve 403.
+
+## Iteración 6 — endurecimiento final (skills) + EXPECTED_ACCOUNT_ID
+- DynamoDB: lista cerrada de CFN + Deny de resource policy/export/restore/lectura de datos. Logs: Deny de
+  subscription filter/export/destinations (DeleteLogGroup no, lo necesita CFN). SNS: sin SetTopicAttributes.
+- apigateway:TagResource se mantiene (evidencia: CREATE_FAILED del stage sin él).
+- Template: EXPECTED_ACCOUNT_ID: !Ref AWS::AccountId, desplegado junto al código de 52ed8b8 (auth.py).
+- simulate-principal-policy 11/11; deploy UPDATE OK; smoke remoto PASS (los 2 resolve PASS); canal → resolve 403.

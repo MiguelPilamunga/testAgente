@@ -71,6 +71,22 @@ Antes del update se simularon 18 casos con `aws iam simulate-principal-policy`; 
 esperado. En la migración, CloudFormation no pudo borrar el rol que antes generaba SAM, porque el deployer tiene
 Deny para hacerlo. Se borró con root, tras verificar que la Lambda ya usa el rol pre-creado.
 
+## v4 — endurecimiento no bloqueante (revisión final de skills)
+- **DynamoDB:** se pasó de `dynamodb:*` a la lista cerrada que usa CloudFormation: Create/Update/DeleteTable,
+  TTL, backups continuos, tags y lecturas `Describe*`/`ListTagsOfResource`/`GetResourcePolicy`. Además hay
+  Deny de `PutResourcePolicy`, `DeleteResourcePolicy`, `ExportTableToPointInTime`, `RestoreTable*` y de lectura
+  de datos (`GetItem`/`BatchGetItem`/`Query`/`Scan`/`PartiQLSelect`): el deployer no puede leer, exportar ni
+  compartir la tabla con PII.
+- **Logs:** Deny de `PutSubscriptionFilter`, `CreateExportTask` y `PutDestination*` (exfiltración).
+  `DeleteLogGroup` **no** se deniega, porque CloudFormation lo necesita para borrar el stack.
+- **SNS:** se retiró `SetTopicAttributes`, así que el deployer no puede cambiar la policy del tópico.
+- **`apigateway:TagResource`:** se **mantiene**. Aunque no figura en la Service Authorization Reference, la creación
+  del stage falló con `not authorized to perform: apigateway:TagResource on .../apis/<id>/stages` hasta añadirlo.
+  Es decir, el handler de CloudFormation ApiGatewayV2 sí lo evalúa.
+- **Confused deputy:** `AddPermission` no admite `lambda:SourceArn`. Como compensación, la función recibe
+  `EXPECTED_ACCOUNT_ID` y `auth.py` exige `requestContext.accountId` igual a ese valor.
+- Verificado con `simulate-principal-policy` (11/11 como se esperaba), update del stack y smoke remoto PASS.
+
 ## Riesgos residuales (aceptados)
 - **Cerrados en v3:** trust arbitrario en `CreateRole`, `logs:PutResourcePolicy` y la bucket policy de SAM.
   IAM Access Analyzer de acceso externo sigue siendo recomendable como detección; no se activó porque es un

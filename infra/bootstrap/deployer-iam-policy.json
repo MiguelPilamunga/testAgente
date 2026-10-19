@@ -103,6 +103,34 @@
         "s3:PutAccountPublicAccessBlock"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "DenyStateTableDataAndSharing",
+      "Effect": "Deny",
+      "Action": [
+        "dynamodb:PutResourcePolicy",
+        "dynamodb:DeleteResourcePolicy",
+        "dynamodb:ExportTableToPointInTime",
+        "dynamodb:RestoreTableFromBackup",
+        "dynamodb:RestoreTableToPointInTime",
+        "dynamodb:GetItem",
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:PartiQLSelect"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyLogExfiltration",
+      "Effect": "Deny",
+      "Action": [
+        "logs:PutSubscriptionFilter",
+        "logs:CreateExportTask",
+        "logs:PutDestination",
+        "logs:PutDestinationPolicy"
+      ],
+      "Resource": "*"
     }
   ]
 }

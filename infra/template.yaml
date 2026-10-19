@@ -145,6 +145,7 @@ Resources:
         Variables:
           STATE_BACKEND: dynamodb
           AUTH_MODE: apigw
+          EXPECTED_ACCOUNT_ID: !Ref AWS::AccountId # auth.py valida requestContext.accountId (confused deputy)
           STATE_TABLE: !Ref OnboardingStateTable
           STATE_TTL_DAYS: !Ref StateTtlDays
           LLM_PROVIDER: !If [HasLlmSecret, !Ref LlmProvider, none]
