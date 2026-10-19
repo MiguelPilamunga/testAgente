@@ -2,7 +2,7 @@ import re
 import unicodedata
 
 from onboarding.llm.client import FallbackLLM
-from onboarding.models import OnboardingState, Status
+from onboarding.models import OnboardingState, Status, mask_document_id
 from onboarding.policies import PRODUCTS
 
 SYSTEM = ("Eres el asistente de onboarding de un banco ecuatoriano. Redacta un mensaje breve (máx. 120 "
@@ -24,6 +24,24 @@ STATUS_LINE = {
 _NEGATED_APPROVAL = re.compile(r"\bno\s+(?:fue\s+|ha\s+sido\s+|sera\s+|puede\s+ser\s+)?aprobad\w*")
 _APPROVAL = re.compile(r"aprobad|approved|felicidades|bienvenid")
 _REJECTION = re.compile(r"rechaz|denegad|\bno\s+(?:fue\s+|ha\s+sido\s+)?aprobad|rejected")
+
+
+_DOCUMENT_ID = re.compile(r"\d{10}")
+
+
+def first_name(s: OnboardingState) -> str:
+    return s.prospect.prospect_name.split()[0]
+
+
+def scrub_pii(s: OnboardingState, text: str) -> str:
+    """LOPDP (RNF-09): lo que sale hacia un proveedor LLM externo no lleva cédula ni apellidos del prospecto.
+
+    Se aplica al prompt completo porque campos de texto libre (p. ej. `product`) también llegan al LLM.
+    """
+    text = _DOCUMENT_ID.sub(lambda m: mask_document_id(m.group()), text)
+    for surname in s.prospect.prospect_name.split()[1:]:
+        text = re.sub(rf"\b{re.escape(surname)}\b", f"{surname[0].upper()}.", text, flags=re.IGNORECASE)
+    return text
 
 
 def _normalize(text: str) -> str:
@@ -54,7 +72,7 @@ class ResponseAgent:
         return f"Estado de tu solicitud: {STATUS_LINE.get(s.status, 'En proceso')}"
 
     def template(self, s: OnboardingState) -> str:
-        name = s.prospect.prospect_name.split()[0]
+        name = first_name(s)
         product = PRODUCTS.get(s.prospect.product, {}).get("name", s.prospect.product)
         docs = "; ".join(s.required_documents)
         match s.status:
@@ -82,10 +100,10 @@ class ResponseAgent:
         return text
 
     def run(self, s: OnboardingState) -> str:
-        facts = {"nombre": s.prospect.prospect_name, "producto": s.prospect.product, "estado": s.status.value,
+        facts = {"nombre": first_name(s), "producto": s.prospect.product, "estado": s.status.value,
                  "documentos_requeridos": s.required_documents,
                  "siguiente_paso_para_cliente": s.proposals[-1] if s.proposals else None}
-        body = self._validate(s, self.llm.complete(SYSTEM, f"Hechos: {facts}"))
+        body = self._validate(s, self.llm.complete(SYSTEM, scrub_pii(s, f"Hechos: {facts}")))
         provider = self.llm.last_provider if body else "template"
         s.log(self.name, "message_generated", provider=provider)
         return f"{self.status_line(s)}\n{body or self.template(s)}"

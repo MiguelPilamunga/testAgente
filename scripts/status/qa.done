@@ -31,8 +31,14 @@
                                dentro de ella no; defaults LLM_BUDGET+LLM_TIMEOUT < 29 s; _float_env inválido ("abc",
                                "", "6s") → default; LLM_TIMEOUT inválido al importar → 6.0 (subproceso limpio).
 
+- tests/test_llm_pii.py        (17) RNF-09 LOPDP: LLM fake captura system+prompt; en los 6 escenarios y tras resolve
+                               (approve/reject/retry) no sale nombre completo, apellidos, document_id ni ninguna
+                               secuencia de 10 dígitos; ResponseAgent envía solo el primer nombre; PII escrita en
+                               `product` (texto libre) también se enmascara; el saludo al cliente sigue con el primer
+                               nombre. Prueba de mutación: sin el enmascarado fallan los 17.
+
 ## Verificación
-    uv run pytest -q          → 117 passed (suite completa, incl. test_auth.py de otra sesión)
+    uv run pytest -q          → 143 passed (suite completa, incl. test_auth.py de otra sesión)
     uv run ruff check tests src/onboarding/agents src/onboarding/llm → All checks passed
 
 ## Observaciones vs SPEC (no se tocó src/)
@@ -65,6 +71,13 @@
 - APLICADO (alcance ampliado por el orquestador SOLO a _float_env en src/onboarding/llm/client.py):
   _float_env acepta únicamente math.isfinite(v) and v > 0; si no, usa el default. Cubierto con nan, NaN, inf,
   -inf, -1, 0, 0.0 y -0.5, y al importar (subproceso) para LLM_TIMEOUT/LLM_BUDGET/LLM_BUDGET_WINDOW → 6/15/29.
+
+- APLICADO RNF-09 (alcance ampliado a agents/response.py y agents/mitigation.py): scrub_pii() en response.py se
+  aplica al prompt COMPLETO de ResponseAgent y MitigationAgent: cédulas (cualquier \d{10}) → mask_document_id
+  (******5678) y cada token del nombre salvo el primero → inicial ("Andrade" → "A."). Facts usan first_name().
+  Se limpia el prompt entero y no solo los campos conocidos porque `product` es texto libre y llega al LLM en el
+  motivo de rechazo y en los hechos. Límite: un nombre que no sea el del prospecto escrito en texto libre no se
+  detecta (no hay NER); las notas del oficial en resolve no se envían al LLM hoy.
 
 ## Pendientes
 - Test de DynamoDBStore (moto) y del handler Mangum (warning DeprecationWarning de asyncio en mangum).

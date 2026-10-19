@@ -1,4 +1,4 @@
-from onboarding.agents.response import LLM_MAX_CHARS, contradiction
+from onboarding.agents.response import LLM_MAX_CHARS, contradiction, scrub_pii
 from onboarding.llm.client import FallbackLLM
 from onboarding.models import Escalation, OnboardingState, Status
 
@@ -17,7 +17,7 @@ class MitigationAgent:
         self.llm = llm
 
     def _validated_extra(self, state: OnboardingState, base: str, reason: str) -> str | None:
-        extra = self.llm.complete(SYSTEM, f"Motivo: {reason}\nPolítica/propuesta base: {base}")
+        extra = self.llm.complete(SYSTEM, scrub_pii(state, f"Motivo: {reason}\nPolítica/propuesta base: {base}"))
         if not extra:
             return None
         # Una mitigación nunca acompaña una aprobación: se valida como caso no aprobado.
