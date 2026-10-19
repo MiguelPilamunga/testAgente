@@ -9,7 +9,9 @@
 - Métricas CloudWatch EMF + dashboard `onboarding-agent-dev-ops` + 8 alarmas (SNS).
 - AWS: stack `onboarding-agent-dev` (cuenta 774305616818, us-east-1), desplegado con IAM `onboarding-deployer`
   con permissions boundary. API: https://o8pjot00p9.execute-api.us-east-1.amazonaws.com
-- Evidencia: pytest 156 passed; newman local 27/27 (143 assertions); newman AWS 28/28 (145 assertions, p95 241 ms).
+- IAM endurecido (revisado y aprobado por skills): rol de función pre-creado, deployer sin CreateRole ni lectura/export de PII;
+  la API exige requestContext.accountId de la propia cuenta.
+- Evidencia: pytest 163 passed; newman local 27/27 (143 assertions); newman AWS 28/28 (145 assertions, p95 241 ms).
 
 ## Pendiente
 - Cargar keys LLM nuevas en Secrets Manager `onboarding-agent/llm-keys` (hoy vacío → modo plantilla).
