@@ -2,59 +2,18 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "RoleReadAndTag",
+      "Sid": "FunctionRoleRead",
       "Effect": "Allow",
       "Action": [
-        "iam:GetRole",
-        "iam:GetRolePolicy",
-        "iam:ListRolePolicies",
-        "iam:ListAttachedRolePolicies",
-        "iam:TagRole",
-        "iam:UntagRole",
-        "iam:DeleteRole"
+        "iam:GetRole"
       ],
-      "Resource": "arn:aws:iam::774305616818:role/onboarding-agent-*"
-    },
-    {
-      "Sid": "RoleWriteOnlyWithBoundary",
-      "Effect": "Allow",
-      "Action": [
-        "iam:CreateRole",
-        "iam:PutRolePolicy",
-        "iam:DeleteRolePolicy"
-      ],
-      "Resource": "arn:aws:iam::774305616818:role/onboarding-agent-*",
-      "Condition": {
-        "StringEquals": {
-          "iam:PermissionsBoundary": "arn:aws:iam::774305616818:policy/onboarding-agent-boundary"
-        }
-      }
-    },
-    {
-      "Sid": "AttachOnlyLambdaBasicAndXRay",
-      "Effect": "Allow",
-      "Action": [
-        "iam:AttachRolePolicy",
-        "iam:DetachRolePolicy"
-      ],
-      "Resource": "arn:aws:iam::774305616818:role/onboarding-agent-*",
-      "Condition": {
-        "StringEquals": {
-          "iam:PermissionsBoundary": "arn:aws:iam::774305616818:policy/onboarding-agent-boundary"
-        },
-        "ArnEquals": {
-          "iam:PolicyARN": [
-            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-            "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
-          ]
-        }
-      }
+      "Resource": "arn:aws:iam::774305616818:role/onboarding-agent-*-function-role"
     },
     {
       "Sid": "PassRoleOnlyToLambda",
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "arn:aws:iam::774305616818:role/onboarding-agent-*",
+      "Resource": "arn:aws:iam::774305616818:role/onboarding-agent-*-function-role",
       "Condition": {
         "StringEquals": {
           "iam:PassedToService": "lambda.amazonaws.com"
@@ -94,7 +53,7 @@
       ]
     },
     {
-      "Sid": "DenyIdentityCreation",
+      "Sid": "DenyIdentityAndRoleWrites",
       "Effect": "Deny",
       "Action": [
         "iam:CreateUser",
@@ -102,7 +61,13 @@
         "iam:PutUserPolicy",
         "iam:CreateAccessKey",
         "iam:CreateLoginProfile",
-        "iam:UpdateAssumeRolePolicy"
+        "iam:UpdateAssumeRolePolicy",
+        "iam:CreateRole",
+        "iam:PutRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DeleteRole",
+        "iam:DeleteRolePolicy",
+        "iam:DetachRolePolicy"
       ],
       "Resource": "*"
     },
@@ -125,6 +90,19 @@
           "lambda:Principal": "apigateway.amazonaws.com"
         }
       }
+    },
+    {
+      "Sid": "DenySamBucketPolicyChanges",
+      "Effect": "Deny",
+      "Action": [
+        "s3:PutBucketPolicy",
+        "s3:DeleteBucketPolicy",
+        "s3:PutBucketAcl",
+        "s3:PutObjectAcl",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:PutAccountPublicAccessBlock"
+      ],
+      "Resource": "*"
     }
   ]
 }

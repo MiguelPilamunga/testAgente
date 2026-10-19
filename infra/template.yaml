@@ -16,6 +16,12 @@ Parameters:
     Description: >
       ARN del secreto en Secrets Manager con JSON {"ANTHROPIC_API_KEY": "...", "OPENAI_API_KEY": "..."}.
       Vacío = modo determinista (plantillas, sin LLM).
+  FunctionRoleArn:
+    Type: String
+    AllowedPattern: ^arn:aws:iam::\d{12}:role/onboarding-agent-[a-z]+-function-role$
+    Description: >
+      Rol de ejecución pre-creado por infra/bootstrap/create-deployer.sh (trust solo Lambda, boundary, permisos
+      mínimos). El deployer no puede crear roles (ADR-0007).
   LlmProvider:
     Type: String
     Default: anthropic
@@ -58,8 +64,6 @@ Globals:
     MemorySize: 512
     Timeout: 29 # = límite de integración de API Gateway; el LLM cabe por LLM_TIMEOUT + LLM_BUDGET
     Tracing: Active
-    # Todo rol de función queda acotado por el boundary (ADR-0007): el deployer no puede crear roles sin él.
-    PermissionsBoundary: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/onboarding-agent-boundary
 
 Resources:
   OnboardingHttpApi:
@@ -149,18 +153,7 @@ Resources:
           LLM_BUDGET: !Ref LlmBudgetSeconds
           ANTHROPIC_MODEL: !Ref AnthropicModel
           OPENAI_MODEL: !Ref OpenAIModel
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref OnboardingStateTable
-        - !If
-          - HasLlmSecret
-          - Version: "2012-10-17"
-            Statement:
-              - Sid: ReadLlmSecret
-                Effect: Allow
-                Action: secretsmanager:GetSecretValue
-                Resource: !Ref LlmSecretArn
-          - !Ref AWS::NoValue
+      Role: !Ref FunctionRoleArn # pre-creado con root en el bootstrap; sus permisos viven en function-role-policy.json
       Events:
         Health:
           Type: HttpApi

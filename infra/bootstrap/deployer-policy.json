@@ -30,16 +30,41 @@
     {
       "Sid": "SamArtifactsBucket",
       "Effect": "Allow",
-      "Action": "s3:*",
-      "Resource": [
-        "arn:aws:s3:::aws-sam-cli-managed-default-*"
-      ]
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": "arn:aws:s3:::aws-sam-cli-managed-default-*"
     },
     {
       "Sid": "Lambda",
       "Effect": "Allow",
-      "Action": "lambda:*",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:DeleteFunction",
+        "lambda:PublishVersion",
+        "lambda:RemovePermission",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:Get*",
+        "lambda:List*"
+      ],
       "Resource": "arn:aws:lambda:us-east-1:774305616818:function:onboarding-agent-*"
+    },
+    {
+      "Sid": "LambdaInvokeOnlyFromApiGateway",
+      "Effect": "Allow",
+      "Action": "lambda:AddPermission",
+      "Resource": "arn:aws:lambda:us-east-1:774305616818:function:onboarding-agent-*",
+      "Condition": {
+        "StringEquals": {
+          "lambda:Principal": "apigateway.amazonaws.com"
+        }
+      }
     },
     {
       "Sid": "ApiGatewayCreateTaggedApi",
@@ -170,7 +195,6 @@
         "logs:UpdateLogDelivery",
         "logs:DeleteLogDelivery",
         "logs:ListLogDeliveries",
-        "logs:PutResourcePolicy",
         "logs:DescribeResourcePolicies"
       ],
       "Resource": "*"

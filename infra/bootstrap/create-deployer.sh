@@ -2,7 +2,7 @@
 # Bootstrap IAM (una sola vez, con credenciales de administrador): crea el permissions boundary
 # `onboarding-agent-boundary` y el usuario `onboarding-deployer` con la política acotada de deployer-policy.json y configura el perfil local `onboarding-deployer`.
 # El secret de la access key va directo a ~/.aws/credentials: nunca se imprime ni se escribe en el repo.
-# Uso: ADMIN_PROFILE=default infra/bootstrap/create-deployer.sh   (re-ejecutable: actualiza la política)
+# Uso: ADMIN_PROFILE=default [STAGE=dev] infra/bootstrap/create-deployer.sh   (re-ejecutable: actualiza políticas y rol)
 set -euo pipefail
 
 ADMIN_PROFILE="${ADMIN_PROFILE:-default}"
@@ -10,6 +10,7 @@ USER_NAME="onboarding-deployer"
 DEPLOY_PROFILE="onboarding-deployer"
 REGION="us-east-1"
 ACCOUNT="774305616818"
+STAGE="${STAGE:-dev}"
 POLICY="$(cd "$(dirname "$0")" && pwd)/deployer-policy.json"
 IAM_POLICY="$(cd "$(dirname "$0")" && pwd)/deployer-iam-policy.json"
 BOUNDARY="$(cd "$(dirname "$0")" && pwd)/boundary-policy.json"
@@ -46,6 +47,27 @@ upsert_policy() { # nombre archivo descripción — crea la política administra
 
 # Permissions boundary obligatorio para todo rol que cree el deployer (ver docs/adr/0007-iam-deployer-boundary.md).
 upsert_policy onboarding-agent-boundary "$BOUNDARY" "Permissions boundary de los roles de onboarding-agent-*"
+# Rol de ejecución de la Lambda, pre-creado aquí (el deployer NO puede crear ni modificar roles: ADR-0007).
+# Trust solo lambda.amazonaws.com de esta cuenta; boundary + permisos mínimos del stage.
+ROLE_NAME="onboarding-agent-$STAGE-function-role"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+if admin iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
+  admin iam update-assume-role-policy --role-name "$ROLE_NAME" --policy-document "file://$DIR/function-role-trust.json"
+  echo "rol $ROLE_NAME ya existe (trust actualizado)"
+else
+  admin iam create-role --role-name "$ROLE_NAME" --assume-role-policy-document "file://$DIR/function-role-trust.json" \
+    --permissions-boundary "arn:aws:iam::$ACCOUNT:policy/onboarding-agent-boundary" \
+    --tags Key=project,Value=onboarding-agent --description "Ejecución de la Lambda onboarding-agent-$STAGE" >/dev/null
+  echo "rol $ROLE_NAME creado"
+fi
+admin iam put-role-permissions-boundary --role-name "$ROLE_NAME" \
+  --permissions-boundary "arn:aws:iam::$ACCOUNT:policy/onboarding-agent-boundary"
+sed "s/STAGE/$STAGE/g" "$DIR/function-role-policy.json" >"$DIR/.function-role-policy.$STAGE.json"
+admin iam put-role-policy --role-name "$ROLE_NAME" --policy-name function \
+  --policy-document "file://$DIR/.function-role-policy.$STAGE.json"
+rm -f "$DIR/.function-role-policy.$STAGE.json"
+echo "rol $ROLE_NAME: arn:aws:iam::$ACCOUNT:role/$ROLE_NAME (parámetro FunctionRoleArn)"
+
 # Administradas (no inline: las inline de usuario están limitadas a 2048 bytes), partidas por el límite de 6144:
 # recursos del stack | controles IAM (boundary obligatorio, PassRole, denies).
 upsert_policy onboarding-agent-deployer "$POLICY" "Despliegue SAM de onboarding-agent-* (recursos)"

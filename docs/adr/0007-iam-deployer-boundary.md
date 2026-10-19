@@ -49,17 +49,39 @@ admin: crear un rol con `AdministratorAccess`, pasarlo a una Lambda e invocarla 
 - **Política de roles:** SAM adjunta `AWSXrayWriteOnlyAccess` (no `AWSXRayDaemonWriteAccess`) cuando hay
   `Tracing: Active`.
 
+## v3 — revisión de seguridad sobre los commits (4 hallazgos cerrados)
+1. **HIGH, trust policy arbitraria en `CreateRole`:** el deployer **ya no crea roles**. El bootstrap (root) pre-crea
+   `onboarding-agent-<stage>-function-role`:
+   - trust solo `lambda.amazonaws.com` con `aws:SourceAccount=774305616818`;
+   - boundary;
+   - política mínima `function-role-policy.json`: logs de su log group, ítems de su tabla, `llm-keys`, X-Ray.
+
+   La plantilla lo recibe por el parámetro `FunctionRoleArn` (`Role:` de la función). Al deployer le quedan solo
+   `iam:GetRole` y `iam:PassRole` sobre `role/onboarding-agent-*-function-role`, este último solo a
+   `lambda.amazonaws.com`. Tiene Deny explícito de `CreateRole`/`PutRolePolicy`/`AttachRolePolicy`/`DeleteRole*`/
+   `DetachRolePolicy`/`UpdateAssumeRolePolicy`.
+2. **MEDIUM, `lambda:*`:** reemplazado por la lista de acciones de SAM. `AddPermission` solo con
+   `lambda:Principal = apigateway.amazonaws.com`, más el Deny para otros principales y para Function URLs.
+   `lambda:SourceArn` no existe como clave de condición de `AddPermission`, así que no se usa.
+3. **MEDIUM, `s3:*` en el bucket de SAM:** solo `GetObject/PutObject/ListBucket/GetBucketLocation`, más Deny de
+   `PutBucketPolicy/DeleteBucketPolicy/PutBucketAcl/PutObjectAcl/Put*PublicAccessBlock`.
+4. **MEDIUM, `logs:PutResourcePolicy`:** eliminado. Los access logs de la HTTP API funcionan sin él.
+
+Antes del update se simularon 18 casos con `aws iam simulate-principal-policy`; los 18 coincidieron con lo
+esperado. En la migración, CloudFormation no pudo borrar el rol que antes generaba SAM, porque el deployer tiene
+Deny para hacerlo. Se borró con root, tras verificar que la Lambda ya usa el rol pre-creado.
+
 ## Riesgos residuales (aceptados)
-- **Trust policy de `CreateRole`:** no se puede acotar por condición. Cualquier rol creado queda limitado por el
-  boundary, pero su trust podría admitir principales externos. Se propone activar IAM Access Analyzer de acceso
-  externo; **no se activó** porque es un cambio de la cuenta compartida y lo decide el usuario.
-- **`logs:CreateLogDelivery`/`PutResourcePolicy`:** no tienen nivel de recurso; los requieren los access logs de la HTTP API.
-- **Bucket gestionado de SAM:** `s3:*` sobre `aws-sam-cli-managed-default-*`, que incluye su bucket policy; es
-  compartido con otros stacks SAM de la región.
+- **Cerrados en v3:** trust arbitrario en `CreateRole`, `logs:PutResourcePolicy` y la bucket policy de SAM.
+  IAM Access Analyzer de acceso externo sigue siendo recomendable como detección; no se activó porque es un
+  cambio de la cuenta compartida y lo decide el usuario.
+- **`logs:CreateLogDelivery` y similares:** no tienen nivel de recurso; los requieren los access logs de la HTTP API.
+- **Bucket de SAM:** se puede leer y escribir objetos de `aws-sam-cli-managed-default-*`, bucket compartido con
+  otros stacks SAM de la región.
 - **Access key de larga duración** del deployer: **borrarla al terminar la evaluación**
   (`aws iam delete-access-key` con root) o rotarla.
 - `DeletionPolicy: Retain` en la tabla: un create fallido deja la tabla huérfana y hay que borrarla antes de reintentar.
-- Una Lambda del proyecto puede ejecutar código arbitrario, pero dentro del boundary; no puede escalar.
+- La Lambda ejecuta con el rol pre-creado (permisos mínimos y boundary); no puede escalar.
 
 ## Consecuencias
 - ✅ El deployer no puede llegar a admin ni crear identidades nuevas; root se usa solo para el bootstrap.

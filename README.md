@@ -100,8 +100,9 @@ Las keys LLM se cargan sin tocar el repo:
 ### Cómo desplegar (manual, sin CI/CD, nunca con root)
 
 ```bash
-# 0) Una sola vez, con credenciales de administrador: boundary + usuario onboarding-deployer + perfil local
-ADMIN_PROFILE=default infra/bootstrap/create-deployer.sh          # ADR-0007
+# 0) Una sola vez por stage, con credenciales de administrador: boundary, rol de la Lambda (pre-creado),
+#    usuario onboarding-deployer y perfil local. El deployer no puede crear roles.
+ADMIN_PROFILE=default STAGE=dev infra/bootstrap/create-deployer.sh   # ADR-0007
 
 # 1) Gate local obligatorio: skill `verify` en PASS (en Claude Code: "verifica")
 # 2) Validar, construir y desplegar con el perfil acotado
@@ -110,12 +111,13 @@ sam build -t infra/template.yaml
 sam deploy --template-file .aws-sam/build/template.yaml --profile onboarding-deployer --region us-east-1 \
   --stack-name onboarding-agent-dev --resolve-s3 --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
   --no-confirm-changeset --tags project=onboarding-agent \
-  --parameter-overrides Stage=dev LlmSecretArn=<ARN de onboarding-agent/llm-keys> [AlarmEmail=<email>]
+  --parameter-overrides Stage=dev LlmSecretArn=<ARN de onboarding-agent/llm-keys> \
+    FunctionRoleArn=arn:aws:iam::774305616818:role/onboarding-agent-dev-function-role [AlarmEmail=<email>]
 ```
 
 - **Sin CI/CD** ([ADR-0005](docs/adr/0005-sin-ci-cd.md)): despliegue manual; `verify` es el gate obligatorio.
 - **IAM** ([ADR-0007](docs/adr/0007-iam-deployer-boundary.md)): `onboarding-deployer` solo opera recursos
-  `onboarding-agent-*` o con tag `project=onboarding-agent`. Todo rol lleva el boundary `onboarding-agent-boundary`.
+  `onboarding-agent-*` o con tag `project=onboarding-agent`. El rol de la Lambda lo pre-crea el bootstrap (`onboarding-agent-dev-function-role`, trust solo Lambda, boundary).
   El tag `--tags project=onboarding-agent` es obligatorio.
 - Un create fallido deja la tabla retenida (`DeletionPolicy: Retain`): bórrala antes de reintentar.
 

@@ -78,3 +78,17 @@
 - Cargar keys LLM nuevas en onboarding-agent/llm-keys (las pegadas en el chat están comprometidas).
 - docs/METRICAS.md cita el log group /aws/lambda/onboarding-agent-orchestrator; el real es
   /aws/lambda/onboarding-agent-dev-orchestrator.
+
+## Iteración 5 — 4 hallazgos de seguridad de los commits (cerrados) + update del stack
+- HIGH: rol de la Lambda pre-creado con root (onboarding-agent-dev-function-role): trust lambda +
+  aws:SourceAccount, boundary, function-role-policy.json mínima. Template: parámetro FunctionRoleArn y Role:,
+  sin Policies ni PermissionsBoundary. Deployer: solo GetRole y PassRole (a lambda) de *-function-role, con Deny
+  de escribir roles.
+- MEDIUM: lambda:* → lista de acciones de SAM; AddPermission solo con Principal apigateway.
+- MEDIUM: S3 del bucket de SAM solo Get/Put/List/GetBucketLocation, más Deny de policy/ACL/PAB.
+- MEDIUM: logs:PutResourcePolicy eliminado.
+- simulate-principal-policy: 18/18 casos como se esperaba (script en el scratchpad de la sesión). Access Analyzer:
+  solo INVALID_ACTION de apigateway:TagResource (conocido).
+- Update → UPDATE_COMPLETE. El rol antiguo de SAM quedó huérfano por el Deny y se borró con root, tras verificar
+  que la Lambda usa el rol nuevo.
+- Smoke remoto con token de oficial: PASS (17/17). Canal → resolve 403.
