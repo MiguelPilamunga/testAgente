@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Onboarding Agent — E2E contrato (docs/SPEC.md)" tests="27" time="0.076">
+  <testsuite name="01 Health / GET /health" id="69e26e7d-5692-45c4-bc24-196278797c39" timestamp="2026-10-19T14:29:02.951Z" tests="4" failures="0" errors="0" time="0.020">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.020" classname="01HealthGetHealth"/>
+    <testcase name="HTTP 200" time="0.020" classname="01HealthGetHealth"/>
+    <testcase name="status ok" time="0.020" classname="01HealthGetHealth"/>
+    <testcase name="Tiempo de respuesta &lt; 29000 ms" time="0.020" classname="01HealthGetHealth"/>
+  </testsuite>
+  <testsuite name="02 Escenarios start (SPEC: tabla document_id) / 1712345678 → APPROVED" id="95b11094-2a37-494c-ae19-d8752feb1cd8" timestamp="2026-10-19T14:29:02.951Z" tests="7" failures="0" errors="0" time="0.006">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.006" classname="02EscenariosStartSpecTablaDocumentId1712345678Approved"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.006" classname="02EscenariosStartSpecTablaDocumentId1712345678Approved"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.006" classname="02EscenariosStartSpecTablaDocumentId1712345678Approved"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.006" classname="02EscenariosStartSpecTablaDocumentId1712345678Approved"/>
+    <testcase name="HTTP 200" time="0.006" classname="02EscenariosStartSpecTablaDocumentId1712345678Approved"/>
+    <testcase name="APPROVED, flujo completo" time="0.006" classname="02EscenariosStartSpecTablaDocumentId1712345678Approved"/>
+    <testcase name="Una sola llamada a verify_identity (sin reintento)" time="0.006" classname="02EscenariosStartSpecTablaDocumentId1712345678Approved"/>
+  </testsuite>
+  <testsuite name="02 Escenarios start (SPEC: tabla document_id) / 0900000001 → REJECTED + propuesta presencial" id="0decbdf2-238f-4028-818c-8ebad32d83f2" timestamp="2026-10-19T14:29:02.951Z" tests="7" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000001RejectedPropuestaPresencial"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000001RejectedPropuestaPresencial"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000001RejectedPropuestaPresencial"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000001RejectedPropuestaPresencial"/>
+    <testcase name="HTTP 200" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000001RejectedPropuestaPresencial"/>
+    <testcase name="REJECTED, no apto" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000001RejectedPropuestaPresencial"/>
+    <testcase name="RF3: proposals con verificación presencial" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000001RejectedPropuestaPresencial"/>
+  </testsuite>
+  <testsuite name="02 Escenarios start (SPEC: tabla document_id) / 0900000002 → ESCALATED (identidad ambigua)" id="530e9af5-5d84-427a-b3cb-02af60a2b350" timestamp="2026-10-19T14:29:02.951Z" tests="7" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000002EscalatedIdentidadAmbigua"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000002EscalatedIdentidadAmbigua"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000002EscalatedIdentidadAmbigua"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000002EscalatedIdentidadAmbigua"/>
+    <testcase name="HTTP 200" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000002EscalatedIdentidadAmbigua"/>
+    <testcase name="ESCALATED pausado en identity" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000002EscalatedIdentidadAmbigua"/>
+    <testcase name="No ejecutó risk (flujo pausado)" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000002EscalatedIdentidadAmbigua"/>
+  </testsuite>
+  <testsuite name="02 Escenarios start (SPEC: tabla document_id) / 0900000003 → ESCALATED (riesgo alto / Cumplimiento)" id="fa1e534d-5df6-4eb3-9167-59663addc799" timestamp="2026-10-19T14:29:02.951Z" tests="6" failures="0" errors="0" time="0.003">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.003" classname="02EscenariosStartSpecTablaDocumentId0900000003EscalatedRiesgoAltoCumplimiento"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.003" classname="02EscenariosStartSpecTablaDocumentId0900000003EscalatedRiesgoAltoCumplimiento"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.003" classname="02EscenariosStartSpecTablaDocumentId0900000003EscalatedRiesgoAltoCumplimiento"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.003" classname="02EscenariosStartSpecTablaDocumentId0900000003EscalatedRiesgoAltoCumplimiento"/>
+    <testcase name="HTTP 200" time="0.003" classname="02EscenariosStartSpecTablaDocumentId0900000003EscalatedRiesgoAltoCumplimiento"/>
+    <testcase name="ESCALATED pausado en risk, severidad high" time="0.003" classname="02EscenariosStartSpecTablaDocumentId0900000003EscalatedRiesgoAltoCumplimiento"/>
+  </testsuite>
+  <testsuite name="02 Escenarios start (SPEC: tabla document_id) / 0900000004 → APPROVED_WITH_CONDITIONS + docs EDD" id="b03a1e19-d7bf-4f0f-b9c3-4f9e527aeeb7" timestamp="2026-10-19T14:29:02.951Z" tests="7" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000004ApprovedWithConditionsDocsEdd"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000004ApprovedWithConditionsDocsEdd"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000004ApprovedWithConditionsDocsEdd"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000004ApprovedWithConditionsDocsEdd"/>
+    <testcase name="HTTP 200" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000004ApprovedWithConditionsDocsEdd"/>
+    <testcase name="APPROVED_WITH_CONDITIONS" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000004ApprovedWithConditionsDocsEdd"/>
+    <testcase name="Documentos de debida diligencia reforzada" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000004ApprovedWithConditionsDocsEdd"/>
+  </testsuite>
+  <testsuite name="02 Escenarios start (SPEC: tabla document_id) / 0900000005 → ESCALATED tras 1 reintento" id="891468c0-938e-42cb-a1e7-3994e7e80b42" timestamp="2026-10-19T14:29:02.951Z" tests="8" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000005EscalatedTras1Reintento"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000005EscalatedTras1Reintento"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000005EscalatedTras1Reintento"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000005EscalatedTras1Reintento"/>
+    <testcase name="HTTP 200" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000005EscalatedTras1Reintento"/>
+    <testcase name="ESCALATED en identity (servicio no disponible)" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000005EscalatedTras1Reintento"/>
+    <testcase name="Reintento único: exactamente 2 llamadas a verify_identity" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000005EscalatedTras1Reintento"/>
+    <testcase name="Propuesta menciona reintento" time="0.002" classname="02EscenariosStartSpecTablaDocumentId0900000005EscalatedTras1Reintento"/>
+  </testsuite>
+  <testsuite name="02 Escenarios start (SPEC: tabla document_id) / Producto inexistente → REJECTED + alternativas" id="4754a426-cf7b-411d-a078-1c8c22f2e181" timestamp="2026-10-19T14:29:02.951Z" tests="7" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="02EscenariosStartSpecTablaDocumentIdProductoInexistenteRejectedAlternativas"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="02EscenariosStartSpecTablaDocumentIdProductoInexistenteRejectedAlternativas"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="02EscenariosStartSpecTablaDocumentIdProductoInexistenteRejectedAlternativas"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="02EscenariosStartSpecTablaDocumentIdProductoInexistenteRejectedAlternativas"/>
+    <testcase name="HTTP 200" time="0.002" classname="02EscenariosStartSpecTablaDocumentIdProductoInexistenteRejectedAlternativas"/>
+    <testcase name="REJECTED" time="0.002" classname="02EscenariosStartSpecTablaDocumentIdProductoInexistenteRejectedAlternativas"/>
+    <testcase name="RF3: propone productos disponibles" time="0.002" classname="02EscenariosStartSpecTablaDocumentIdProductoInexistenteRejectedAlternativas"/>
+  </testsuite>
+  <testsuite name="02 Escenarios start (SPEC: tabla document_id) / document_id con 3 dígitos → 422" id="570ea401-68c7-433c-9f2a-e32b9a6f3eb5" timestamp="2026-10-19T14:29:02.951Z" tests="3" failures="0" errors="0" time="0.003">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.003" classname="02EscenariosStartSpecTablaDocumentIdDocumentIdCon3Digitos422"/>
+    <testcase name="HTTP 422" time="0.003" classname="02EscenariosStartSpecTablaDocumentIdDocumentIdCon3Digitos422"/>
+    <testcase name="detalle de validación" time="0.003" classname="02EscenariosStartSpecTablaDocumentIdDocumentIdCon3Digitos422"/>
+  </testsuite>
+  <testsuite name="02 Escenarios start (SPEC: tabla document_id) / document_id con letras → 422" id="24d73c90-3a25-4af3-a19f-c9559ca702dd" timestamp="2026-10-19T14:29:02.951Z" tests="2" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="02EscenariosStartSpecTablaDocumentIdDocumentIdConLetras422"/>
+    <testcase name="HTTP 422" time="0.002" classname="02EscenariosStartSpecTablaDocumentIdDocumentIdConLetras422"/>
+  </testsuite>
+  <testsuite name="02 Escenarios start (SPEC: tabla document_id) / Body sin product → 422" id="4f664acc-f6de-4ae6-8733-db989f054743" timestamp="2026-10-19T14:29:02.951Z" tests="2" failures="0" errors="0" time="0.001">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.001" classname="02EscenariosStartSpecTablaDocumentIdBodySinProduct422"/>
+    <testcase name="HTTP 422" time="0.001" classname="02EscenariosStartSpecTablaDocumentIdBodySinProduct422"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / A1 start 0900000002 → ESCALATED (guarda ids)" id="a4604817-b9b3-4b94-a788-9d5ec3b4eb77" timestamp="2026-10-19T14:29:02.951Z" tests="6" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA1Start0900000002EscalatedGuardaIds"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA1Start0900000002EscalatedGuardaIds"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA1Start0900000002EscalatedGuardaIds"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA1Start0900000002EscalatedGuardaIds"/>
+    <testcase name="HTTP 200" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA1Start0900000002EscalatedGuardaIds"/>
+    <testcase name="ESCALATED con escalación OPEN" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA1Start0900000002EscalatedGuardaIds"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / A2 GET estado → ESCALATED persistido" id="38f336ee-4700-4442-af4f-f33f9639b220" timestamp="2026-10-19T14:29:02.951Z" tests="6" failures="0" errors="0" time="0.003">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.003" classname="03EstadoConversacionalPausaResolveReanudaA2GetEstadoEscalatedPersistido"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.003" classname="03EstadoConversacionalPausaResolveReanudaA2GetEstadoEscalatedPersistido"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.003" classname="03EstadoConversacionalPausaResolveReanudaA2GetEstadoEscalatedPersistido"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.003" classname="03EstadoConversacionalPausaResolveReanudaA2GetEstadoEscalatedPersistido"/>
+    <testcase name="HTTP 200" time="0.003" classname="03EstadoConversacionalPausaResolveReanudaA2GetEstadoEscalatedPersistido"/>
+    <testcase name="Mismo onboarding, sigue ESCALATED" time="0.003" classname="03EstadoConversacionalPausaResolveReanudaA2GetEstadoEscalatedPersistido"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / A3 resolve approve → APPROVED" id="eef4c071-c302-43a9-a4e9-58ebf1613b96" timestamp="2026-10-19T14:29:02.951Z" tests="7" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA3ResolveApproveApproved"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA3ResolveApproveApproved"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA3ResolveApproveApproved"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA3ResolveApproveApproved"/>
+    <testcase name="HTTP 200" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA3ResolveApproveApproved"/>
+    <testcase name="Reanuda desde risk hasta APPROVED" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA3ResolveApproveApproved"/>
+    <testcase name="Escalación marcada RESOLVED" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA3ResolveApproveApproved"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / A4 GET estado → APPROVED persistido" id="1361a5a9-f9da-43d5-ab21-20b1269b1728" timestamp="2026-10-19T14:29:02.951Z" tests="6" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA4GetEstadoApprovedPersistido"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA4GetEstadoApprovedPersistido"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA4GetEstadoApprovedPersistido"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA4GetEstadoApprovedPersistido"/>
+    <testcase name="HTTP 200" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA4GetEstadoApprovedPersistido"/>
+    <testcase name="APPROVED persistido" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA4GetEstadoApprovedPersistido"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / A5 resolve de nuevo → 409" id="d926f277-f7af-4634-a6e1-f3aa66b4d925" timestamp="2026-10-19T14:29:02.951Z" tests="2" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA5ResolveDeNuevo409"/>
+    <testcase name="HTTP 409" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA5ResolveDeNuevo409"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / A6 resolve escalación inexistente → 404" id="d83c0b21-e6b0-465b-8afd-94f71f4608b3" timestamp="2026-10-19T14:29:02.951Z" tests="2" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA6ResolveEscalacionInexistente404"/>
+    <testcase name="HTTP 404" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA6ResolveEscalacionInexistente404"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / A7 GET onboarding inexistente → 404" id="cad7175d-dc22-4081-bee2-8cf178f19bff" timestamp="2026-10-19T14:29:02.951Z" tests="2" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA7GetOnboardingInexistente404"/>
+    <testcase name="HTTP 404" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaA7GetOnboardingInexistente404"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / B1 start 0900000003 → ESCALATED (guarda ids)" id="3d3e11ab-ca5d-498c-bb0e-4f989be17464" timestamp="2026-10-19T14:29:02.951Z" tests="5" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB1Start0900000003EscalatedGuardaIds"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB1Start0900000003EscalatedGuardaIds"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB1Start0900000003EscalatedGuardaIds"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB1Start0900000003EscalatedGuardaIds"/>
+    <testcase name="HTTP 200" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB1Start0900000003EscalatedGuardaIds"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / B3 resolve reject → REJECTED" id="fa7add25-1049-49a1-b6c3-033c2bca28fb" timestamp="2026-10-19T14:29:02.951Z" tests="7" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB3ResolveRejectRejected"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB3ResolveRejectRejected"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB3ResolveRejectRejected"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB3ResolveRejectRejected"/>
+    <testcase name="HTTP 200" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB3ResolveRejectRejected"/>
+    <testcase name="Termina REJECTED, no apto" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB3ResolveRejectRejected"/>
+    <testcase name="No llegó a documentation" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaB3ResolveRejectRejected"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / C1 start 0900000005 → ESCALATED (guarda ids)" id="0a64689b-4ca5-4bd8-a022-7f9e505e51db" timestamp="2026-10-19T14:29:02.951Z" tests="5" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC1Start0900000005EscalatedGuardaIds"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC1Start0900000005EscalatedGuardaIds"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC1Start0900000005EscalatedGuardaIds"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC1Start0900000005EscalatedGuardaIds"/>
+    <testcase name="HTTP 200" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC1Start0900000005EscalatedGuardaIds"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / C2 resolve retry → re-ejecuta identity" id="9522f4fd-ec51-4bb7-8384-16944012a91f" timestamp="2026-10-19T14:29:02.951Z" tests="7" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC2ResolveRetryReEjecutaIdentity"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC2ResolveRetryReEjecutaIdentity"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC2ResolveRetryReEjecutaIdentity"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC2ResolveRetryReEjecutaIdentity"/>
+    <testcase name="HTTP 200" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC2ResolveRetryReEjecutaIdentity"/>
+    <testcase name="Re-ejecuta identity (2 llamadas más) y vuelve a escalar" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC2ResolveRetryReEjecutaIdentity"/>
+    <testcase name="Nueva escalación OPEN distinta de la resuelta" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC2ResolveRetryReEjecutaIdentity"/>
+  </testsuite>
+  <testsuite name="03 Estado conversacional (pausa → resolve → reanuda) / C3 resolve con action inválida → 422" id="c57249b7-658e-4da9-ab4c-e63f34d0a41d" timestamp="2026-10-19T14:29:02.951Z" tests="2" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC3ResolveConActionInvalida422"/>
+    <testcase name="HTTP 422" time="0.002" classname="03EstadoConversacionalPausaResolveReanudaC3ResolveConActionInvalida422"/>
+  </testsuite>
+  <testsuite name="04 Guardrails (LLM solo redacta, LOPDP) / G1 APPROVED → línea 'Aprobada'" id="6e4e95f7-9885-49b9-b7b9-909f8201a944" timestamp="2026-10-19T14:29:02.951Z" tests="6" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG1ApprovedLineaAprobada"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG1ApprovedLineaAprobada"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG1ApprovedLineaAprobada"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG1ApprovedLineaAprobada"/>
+    <testcase name="HTTP 200" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG1ApprovedLineaAprobada"/>
+    <testcase name="Línea de estado: Aprobada" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG1ApprovedLineaAprobada"/>
+  </testsuite>
+  <testsuite name="04 Guardrails (LLM solo redacta, LOPDP) / G2 REJECTED → línea 'No aprobada' + audit enmascarado" id="923651df-5664-4c97-900c-6a1aa779c0bf" timestamp="2026-10-19T14:29:02.951Z" tests="8" failures="0" errors="0" time="0.001">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG2RejectedLineaNoAprobadaAuditEnmascarado"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG2RejectedLineaNoAprobadaAuditEnmascarado"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG2RejectedLineaNoAprobadaAuditEnmascarado"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG2RejectedLineaNoAprobadaAuditEnmascarado"/>
+    <testcase name="HTTP 200" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG2RejectedLineaNoAprobadaAuditEnmascarado"/>
+    <testcase name="Línea de estado: No aprobada" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG2RejectedLineaNoAprobadaAuditEnmascarado"/>
+    <testcase name="Audit con cédula enmascarada (******0001)" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG2RejectedLineaNoAprobadaAuditEnmascarado"/>
+    <testcase name="Propuesta al cliente solo del catálogo (sin texto LLM)" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG2RejectedLineaNoAprobadaAuditEnmascarado"/>
+  </testsuite>
+  <testsuite name="04 Guardrails (LLM solo redacta, LOPDP) / G3 ESCALATED → línea 'En revisión'" id="445f8763-b3fa-4d3d-a30b-798c2d1729df" timestamp="2026-10-19T14:29:02.951Z" tests="6" failures="0" errors="0" time="0.002">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG3EscalatedLineaEnRevision"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG3EscalatedLineaEnRevision"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG3EscalatedLineaEnRevision"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG3EscalatedLineaEnRevision"/>
+    <testcase name="HTTP 200" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG3EscalatedLineaEnRevision"/>
+    <testcase name="Línea de estado: En revisión" time="0.002" classname="04GuardrailsLlmSoloRedactaLopdpG3EscalatedLineaEnRevision"/>
+  </testsuite>
+  <testsuite name="04 Guardrails (LLM solo redacta, LOPDP) / G4 APPROVED_WITH_CONDITIONS → línea 'Aprobada con condiciones'" id="ec87366a-7e93-4520-b265-04765ac91eda" timestamp="2026-10-19T14:29:02.951Z" tests="6" failures="0" errors="0" time="0.001">
+    <testcase name="Tiempo de respuesta &lt; 29000 ms (límite API Gateway)" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG4ApprovedWithConditionsLineaAprobadaConCondiciones"/>
+    <testcase name="Contrato SPEC: campos de respuesta" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG4ApprovedWithConditionsLineaAprobadaConCondiciones"/>
+    <testcase name="Guardrail: customer_message empieza con línea de estado determinista" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG4ApprovedWithConditionsLineaAprobadaConCondiciones"/>
+    <testcase name="LOPDP: auditoría sin cédula completa" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG4ApprovedWithConditionsLineaAprobadaConCondiciones"/>
+    <testcase name="HTTP 200" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG4ApprovedWithConditionsLineaAprobadaConCondiciones"/>
+    <testcase name="Línea de estado: Aprobada con condiciones" time="0.001" classname="04GuardrailsLlmSoloRedactaLopdpG4ApprovedWithConditionsLineaAprobadaConCondiciones"/>
+  </testsuite>
+</testsuites>

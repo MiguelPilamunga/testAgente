@@ -37,6 +37,16 @@
                                `product` (texto libre) también se enmascara; el saludo al cliente sigue con el primer
                                nombre. Prueba de mutación: sin el enmascarado fallan los 17.
 
+- postman/onboarding-agent.postman_collection.json  Collection v2.1, 28 requests / 4 carpetas (Health, Escenarios
+                               start, Estado conversacional approve/reject/retry/409/404/422, Guardrails). Script de
+                               colección: tiempo < 29000 ms, campos del contrato, propuesta en toda escalación, línea
+                               "Estado de tu solicitud:", audit sin cédula. Auth: {{token_channel}} (start/get),
+                               {{token_officer}} (resolve), noauth (/health); 403 con token_channel solo AWS
+                               (pm.execution.skipRequest en localhost).
+- postman/local.postman_environment.json, postman/aws.postman_environment.json (tokens vacíos, sin secretos).
+- docs/evidencia/{README.md, newman-local.html, newman-local.json, newman-local-junit.xml}
+  newman local: 27/27 requests, 143/143 assertions, 0 fallos (1 request solo-AWS saltada).
+
 ## Verificación
     uv run pytest -q          → 143 passed (suite completa, incl. test_auth.py de otra sesión)
     uv run ruff check tests src/onboarding/agents src/onboarding/llm → All checks passed
@@ -79,5 +89,9 @@
   motivo de rechazo y en los hechos. Límite: un nombre que no sea el del prospecto escrito en texto libre no se
   detecta (no hay NER); las notas del oficial en resolve no se envían al LLM hoy.
 
+- Evidencia: infra/bootstrap/get-token.sh aún no existe (arch); el README asume que imprime solo el ID token.
+  Al correr contra AWS no publicar el reporte JSON de newman (incluye el header Authorization resuelto).
+
 ## Pendientes
+- Correr la colección contra AWS cuando arch despliegue (newman-aws-junit.xml).
 - Test de DynamoDBStore (moto) y del handler Mangum (warning DeprecationWarning de asyncio en mangum).

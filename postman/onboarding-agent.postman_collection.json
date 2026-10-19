@@ -1,0 +1,1337 @@
+{
+  "info": {
+    "_postman_id": "6127d00e-9c2a-5fe0-ade4-9f74613409b1",
+    "name": "Onboarding Agent — E2E contrato (docs/SPEC.md)",
+    "description": "Tests E2E del orquestador de onboarding: escenarios mock por document_id, estado conversacional (pausa/resolve/reanuda), guardrails LLM y LOPDP. Fuente de verdad: docs/SPEC.md. Ejecutar en orden (las carpetas 03 dependen de variables de colección). Auth: start/get usan {{token_channel}} (canal digital); resolve usa {{token_officer}} (grupo compliance); /health sin auth. En local ambos tokens van vacíos (AUTH_MODE=none).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token_channel}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// --- Tests comunes (todas las requests) ---",
+          "pm.test(\"Tiempo de respuesta < 29000 ms (límite API Gateway)\", function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(29000);",
+          "});",
+          "const isState = pm.response.code === 200 && pm.request.url.getPath().indexOf(\"/api/v1/onboarding\") === 0;",
+          "if (isState) {",
+          "    const b = pm.response.json();",
+          "    pm.test(\"Contrato SPEC: campos de respuesta\", function () {",
+          "        [\"onboarding_id\", \"status\", \"current_step\", \"decision\", \"steps\", \"escalations\",",
+          "         \"required_documents\", \"customer_message\", \"audit\", \"proposals\"].forEach(function (k) {",
+          "            pm.expect(b, \"falta \" + k).to.have.property(k);",
+          "        });",
+          "        pm.expect([\"APPROVED\", \"APPROVED_WITH_CONDITIONS\", \"REJECTED\", \"ESCALATED\"]).to.include(b.status);",
+          "        pm.expect([\"identity\", \"risk\", \"documentation\", \"decision\", \"response\", \"done\"]).to.include(b.current_step);",
+          "        pm.expect(b.decision).to.have.property(\"reasons\").that.is.an(\"array\");",
+          "        pm.expect(b.escalations).to.be.an(\"array\");",
+          "        b.escalations.forEach(function (e) {",
+          "            [\"id\", \"step\", \"reason\", \"severity\", \"proposal\", \"status\"].forEach(function (k) {",
+          "                pm.expect(e, \"escalation sin \" + k).to.have.property(k);",
+          "            });",
+          "            pm.expect([\"OPEN\", \"RESOLVED\"]).to.include(e.status);",
+          "            pm.expect(e.proposal, \"RF3: toda escalación propone una solución\").to.be.a(\"string\").and.not.empty;",
+          "        });",
+          "        b.audit.forEach(function (a) {",
+          "            pm.expect(a).to.include.all.keys(\"ts\", \"agent\", \"event\", \"detail\");",
+          "        });",
+          "    });",
+          "    pm.test(\"Guardrail: customer_message empieza con línea de estado determinista\", function () {",
+          "        pm.expect(b.customer_message.indexOf(\"Estado de tu solicitud:\")).to.eql(0);",
+          "    });",
+          "    pm.test(\"LOPDP: auditoría sin cédula completa\", function () {",
+          "        const audit = JSON.stringify(b.audit);",
+          "        if (b.prospect && b.prospect.document_id) {",
+          "            pm.expect(audit).to.not.include(b.prospect.document_id);",
+          "        }",
+          "        pm.expect(/\\d{10}/.test(audit), \"ninguna secuencia de 10 dígitos en audit\").to.be.false;",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "a_onboarding_id",
+      "value": ""
+    },
+    {
+      "key": "a_escalation_id",
+      "value": ""
+    },
+    {
+      "key": "b_onboarding_id",
+      "value": ""
+    },
+    {
+      "key": "b_escalation_id",
+      "value": ""
+    },
+    {
+      "key": "c_onboarding_id",
+      "value": ""
+    },
+    {
+      "key": "c_escalation_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "pm.test(\"status ok\", function () { pm.expect(pm.response.json().status).to.eql(\"ok\"); });",
+                  "pm.test(\"Tiempo de respuesta < 29000 ms\", function () { pm.expect(pm.response.responseTime).to.be.below(29000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/health",
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Escenarios start (SPEC: tabla document_id)",
+      "item": [
+        {
+          "name": "1712345678 → APPROVED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"APPROVED, flujo completo\", function () {",
+                  "    pm.expect(b.status).to.eql(\"APPROVED\");",
+                  "    pm.expect(b.current_step).to.eql(\"done\");",
+                  "    pm.expect(b.decision.eligible).to.be.true;",
+                  "    pm.expect(b.required_documents).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(b.steps).to.include.all.keys(\"identity\", \"risk\", \"documentation\");",
+                  "});",
+                  "pm.test(\"Una sola llamada a verify_identity (sin reintento)\", function () { pm.expect(toolCalls(\"verify_identity\").length).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"1712345678\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "0900000001 → REJECTED + propuesta presencial",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"REJECTED, no apto\", function () {",
+                  "    pm.expect(b.status).to.eql(\"REJECTED\");",
+                  "    pm.expect(b.decision.eligible).to.be.false;",
+                  "    pm.expect(b.decision.reasons).to.not.be.empty;",
+                  "});",
+                  "pm.test(\"RF3: proposals con verificación presencial\", function () {",
+                  "    pm.expect(b.proposals).to.not.be.empty;",
+                  "    pm.expect(b.proposals.join(\" \").toLowerCase()).to.include(\"presencial\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000001\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "0900000002 → ESCALATED (identidad ambigua)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"ESCALATED pausado en identity\", function () {",
+                  "    pm.expect(b.status).to.eql(\"ESCALATED\");",
+                  "    pm.expect(b.current_step).to.eql(\"identity\");",
+                  "    pm.expect(openEsc.length).to.eql(1);",
+                  "    pm.expect(openEsc[0].step).to.eql(\"identity\");",
+                  "});",
+                  "pm.test(\"No ejecutó risk (flujo pausado)\", function () { pm.expect(toolCalls(\"check_risk_lists\").length).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000002\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "0900000003 → ESCALATED (riesgo alto / Cumplimiento)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"ESCALATED pausado en risk, severidad high\", function () {",
+                  "    pm.expect(b.status).to.eql(\"ESCALATED\");",
+                  "    pm.expect(b.current_step).to.eql(\"risk\");",
+                  "    pm.expect(openEsc[0].step).to.eql(\"risk\");",
+                  "    pm.expect(openEsc[0].severity).to.eql(\"high\");",
+                  "    pm.expect(b.decision.eligible).to.not.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000003\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "0900000004 → APPROVED_WITH_CONDITIONS + docs EDD",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"APPROVED_WITH_CONDITIONS\", function () {",
+                  "    pm.expect(b.status).to.eql(\"APPROVED_WITH_CONDITIONS\");",
+                  "    pm.expect(b.decision.eligible).to.be.true;",
+                  "});",
+                  "pm.test(\"Documentos de debida diligencia reforzada\", function () {",
+                  "    pm.expect(b.required_documents).to.include(\"Declaración jurada de origen lícito de fondos\");",
+                  "    pm.expect(b.required_documents).to.include(\"Formulario de Persona Expuesta Políticamente (PEP)\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000004\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "0900000005 → ESCALATED tras 1 reintento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"ESCALATED en identity (servicio no disponible)\", function () {",
+                  "    pm.expect(b.status).to.eql(\"ESCALATED\");",
+                  "    pm.expect(b.current_step).to.eql(\"identity\");",
+                  "    pm.expect(openEsc[0].step).to.eql(\"identity\");",
+                  "});",
+                  "pm.test(\"Reintento único: exactamente 2 llamadas a verify_identity\", function () {",
+                  "    pm.expect(toolCalls(\"verify_identity\").length).to.eql(2);",
+                  "});",
+                  "pm.test(\"Propuesta menciona reintento\", function () { pm.expect(openEsc[0].proposal.toLowerCase()).to.include(\"retry\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000005\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Producto inexistente → REJECTED + alternativas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"REJECTED\", function () { pm.expect(b.status).to.eql(\"REJECTED\"); pm.expect(b.decision.eligible).to.be.false; });",
+                  "pm.test(\"RF3: propone productos disponibles\", function () {",
+                  "    const p = b.proposals.join(\" \");",
+                  "    [\"cuenta_ahorros\", \"cuenta_corriente\", \"tarjeta_credito\"].forEach(function (x) { pm.expect(p).to.include(x); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"1712345678\",\n  \"product\": \"hipoteca_lunar\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "document_id con 3 dígitos → 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "pm.test(\"detalle de validación\", function () { pm.expect(pm.response.json()).to.have.property(\"detail\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"123\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "document_id con letras → 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"17123456ab\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Body sin product → 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"1712345678\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Estado conversacional (pausa → resolve → reanuda)",
+      "item": [
+        {
+          "name": "A1 start 0900000002 → ESCALATED (guarda ids)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"ESCALATED con escalación OPEN\", function () {",
+                  "    pm.expect(b.status).to.eql(\"ESCALATED\");",
+                  "    pm.expect(openEsc.length).to.eql(1);",
+                  "});",
+                  "pm.collectionVariables.set(\"a_onboarding_id\", b.onboarding_id);",
+                  "pm.collectionVariables.set(\"a_escalation_id\", openEsc.length ? openEsc[0].id : \"\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000002\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A2 GET estado → ESCALATED persistido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"Mismo onboarding, sigue ESCALATED\", function () {",
+                  "    pm.expect(b.onboarding_id).to.eql(pm.collectionVariables.get(\"a_onboarding_id\"));",
+                  "    pm.expect(b.status).to.eql(\"ESCALATED\");",
+                  "    pm.expect(openEsc[0].id).to.eql(pm.collectionVariables.get(\"a_escalation_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/onboarding/{{a_onboarding_id}}",
+            "description": ""
+          }
+        },
+        {
+          "name": "A3 resolve approve → APPROVED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"Reanuda desde risk hasta APPROVED\", function () {",
+                  "    pm.expect(b.status).to.eql(\"APPROVED\");",
+                  "    pm.expect(b.current_step).to.eql(\"done\");",
+                  "    pm.expect(b.steps).to.include.all.keys(\"risk\", \"documentation\");",
+                  "    pm.expect(toolCalls(\"check_risk_lists\").length).to.eql(1);",
+                  "});",
+                  "pm.test(\"Escalación marcada RESOLVED\", function () {",
+                  "    const id = pm.collectionVariables.get(\"a_escalation_id\");",
+                  "    pm.expect(b.escalations.filter(function (e) { return e.id === id; })[0].status).to.eql(\"RESOLVED\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/{{a_onboarding_id}}/resolve",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"escalation_id\": \"{{a_escalation_id}}\",\n  \"action\": \"approve\",\n  \"notes\": \"revisado por oficial de cumplimiento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_officer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "A4 GET estado → APPROVED persistido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "pm.test(\"APPROVED persistido\", function () { pm.expect(b.status).to.eql(\"APPROVED\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/onboarding/{{a_onboarding_id}}",
+            "description": ""
+          }
+        },
+        {
+          "name": "A5 resolve de nuevo → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/{{a_onboarding_id}}/resolve",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"escalation_id\": \"{{a_escalation_id}}\",\n  \"action\": \"approve\",\n  \"notes\": \"revisado por oficial de cumplimiento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_officer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "A6 resolve escalación inexistente → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/{{a_onboarding_id}}/resolve",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"escalation_id\": \"no-existe\",\n  \"action\": \"approve\",\n  \"notes\": \"revisado por oficial de cumplimiento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_officer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "A7 GET onboarding inexistente → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/onboarding/00000000-0000-0000-0000-000000000000",
+            "description": ""
+          }
+        },
+        {
+          "name": "B1 start 0900000003 → ESCALATED (guarda ids)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "pm.collectionVariables.set(\"b_onboarding_id\", b.onboarding_id);",
+                  "pm.collectionVariables.set(\"b_escalation_id\", openEsc.length ? openEsc[0].id : \"\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000003\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "B2 resolve con token_channel (sin grupo compliance) → 403 [solo AWS]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Sin authorizer en local (AUTH_MODE=none): este caso solo aplica contra AWS.",
+                  "if (/localhost|127\\.0\\.0\\.1/.test(pm.environment.get(\"base_url\") || pm.variables.get(\"base_url\"))) {",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/{{b_onboarding_id}}/resolve",
+            "description": "Usa el token del canal digital (hereda {{token_channel}}): el authorizer/require_compliance debe rechazarlo. Se salta en localhost porque allí AUTH_MODE=none.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"escalation_id\": \"{{b_escalation_id}}\",\n  \"action\": \"approve\",\n  \"notes\": \"revisado por oficial de cumplimiento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "B3 resolve reject → REJECTED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"Termina REJECTED, no apto\", function () {",
+                  "    pm.expect(b.status).to.eql(\"REJECTED\");",
+                  "    pm.expect(b.decision.eligible).to.be.false;",
+                  "    pm.expect(b.current_step).to.eql(\"done\");",
+                  "});",
+                  "pm.test(\"No llegó a documentation\", function () { pm.expect(toolCalls(\"prepare_documentation\").length).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/{{b_onboarding_id}}/resolve",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"escalation_id\": \"{{b_escalation_id}}\",\n  \"action\": \"reject\",\n  \"notes\": \"revisado por oficial de cumplimiento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_officer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "C1 start 0900000005 → ESCALATED (guarda ids)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "pm.collectionVariables.set(\"c_onboarding_id\", b.onboarding_id);",
+                  "pm.collectionVariables.set(\"c_escalation_id\", openEsc.length ? openEsc[0].id : \"\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000005\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "C2 resolve retry → re-ejecuta identity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"Re-ejecuta identity (2 llamadas más) y vuelve a escalar\", function () {",
+                  "    pm.expect(toolCalls(\"verify_identity\").length).to.eql(4);",
+                  "    pm.expect(b.status).to.eql(\"ESCALATED\");",
+                  "    pm.expect(b.current_step).to.eql(\"identity\");",
+                  "});",
+                  "pm.test(\"Nueva escalación OPEN distinta de la resuelta\", function () {",
+                  "    pm.expect(openEsc.length).to.eql(1);",
+                  "    pm.expect(openEsc[0].id).to.not.eql(pm.collectionVariables.get(\"c_escalation_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/{{c_onboarding_id}}/resolve",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"escalation_id\": \"{{c_escalation_id}}\",\n  \"action\": \"retry\",\n  \"notes\": \"revisado por oficial de cumplimiento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_officer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "C3 resolve con action inválida → 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", function () { pm.response.to.have.status(422); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/{{c_onboarding_id}}/resolve",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"escalation_id\": \"{{c_escalation_id}}\",\n  \"action\": \"maybe\",\n  \"notes\": \"revisado por oficial de cumplimiento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_officer}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Guardrails (LLM solo redacta, LOPDP)",
+      "item": [
+        {
+          "name": "G1 APPROVED → línea 'Aprobada'",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"Línea de estado: Aprobada\", function () {",
+                  "    pm.expect(b.customer_message.split(\"\\n\")[0]).to.eql(\"Estado de tu solicitud: Aprobada\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"1712345678\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "G2 REJECTED → línea 'No aprobada' + audit enmascarado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"Línea de estado: No aprobada\", function () {",
+                  "    pm.expect(b.customer_message.split(\"\\n\")[0]).to.eql(\"Estado de tu solicitud: No aprobada\");",
+                  "});",
+                  "pm.test(\"Audit con cédula enmascarada (******0001)\", function () {",
+                  "    pm.expect(JSON.stringify(b.audit)).to.include(\"******0001\");",
+                  "});",
+                  "pm.test(\"Propuesta al cliente solo del catálogo (sin texto LLM)\", function () {",
+                  "    pm.expect(b.proposals.length).to.eql(1);",
+                  "    pm.expect(b.proposals[0].indexOf(\"\\n\")).to.eql(-1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000001\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "G3 ESCALATED → línea 'En revisión'",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"Línea de estado: En revisión\", function () {",
+                  "    pm.expect(b.customer_message.split(\"\\n\")[0]).to.eql(\"Estado de tu solicitud: En revisión\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000002\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "G4 APPROVED_WITH_CONDITIONS → línea 'Aprobada con condiciones'",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "",
+                  "const b = pm.response.json();",
+                  "const openEsc = (b.escalations || []).filter(function (e) { return e.status === \"OPEN\"; });",
+                  "const toolCalls = function (tool) {",
+                  "    return (b.audit || []).filter(function (a) { return a.event === \"tool_call\" && a.detail && a.detail.tool === tool; });",
+                  "};",
+                  "",
+                  "pm.test(\"Línea de estado: Aprobada con condiciones\", function () {",
+                  "    pm.expect(b.customer_message.split(\"\\n\")[0]).to.eql(\"Estado de tu solicitud: Aprobada con condiciones\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/onboarding/start",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prospect_name\": \"Ana Pérez\",\n  \"document_id\": \"0900000004\",\n  \"product\": \"cuenta_ahorros\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -7,3 +7,7 @@ __pycache__/
 .pytest_cache/
 .aws-sam/
 samconfig.toml
+
+# reportes newman contra AWS pueden contener el header Authorization resuelto
+docs/evidencia/*aws*.json
+docs/evidencia/*aws*.html
