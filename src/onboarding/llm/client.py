@@ -1,6 +1,7 @@
 """Gateway LLM: Claude principal, OpenAI fallback, plantilla determinista si no hay keys o fallan ambos."""
 import json
 import logging
+import math
 import os
 import time
 from collections import deque
@@ -12,10 +13,12 @@ log = logging.getLogger(__name__)
 
 
 def _float_env(name: str, default: float) -> float:
+    """Lee segundos desde el entorno; solo acepta valores finitos y > 0 (nan/inf/≤0 romperían el límite de 29 s)."""
     try:
-        return float(os.getenv(name, default))
+        value = float(os.getenv(name, default))
     except ValueError:
         return default
+    return value if math.isfinite(value) and value > 0 else default
 
 
 # Una petición hace hasta 2 llamadas LLM (mitigación + respuesta) × 2 proveedores; con estos topes el peor caso

@@ -103,7 +103,7 @@ def test_defaults_fit_api_gateway_limit():
     assert (llm.budget, llm.budget_window) == (llm_client.LLM_BUDGET, llm_client.LLM_BUDGET_WINDOW)
 
 
-@pytest.mark.parametrize("value", ["abc", "", "6s"])
+@pytest.mark.parametrize("value", ["abc", "", "6s", "nan", "NaN", "inf", "-inf", "-1", "0", "0.0", "-0.5"])
 def test_float_env_invalid_falls_back_to_default(monkeypatch, value):
     monkeypatch.setenv("LLM_TIMEOUT", value)
     assert llm_client._float_env("LLM_TIMEOUT", 6.0) == 6.0
@@ -114,11 +114,11 @@ def test_float_env_valid_value(monkeypatch):
     assert llm_client._float_env("LLM_TIMEOUT", 6.0) == 3.5
 
 
-def test_invalid_llm_timeout_env_at_import_uses_default():
+@pytest.mark.parametrize("value", ["no-es-numero", "nan", "inf", "-1", "0"])
+def test_invalid_env_at_import_uses_defaults(value):
     # Las constantes se leen al importar: se comprueba en un proceso limpio para no recargar el módulo compartido.
-    env = {**os.environ, "LLM_TIMEOUT": "no-es-numero", "PYTHONPATH": str(SRC)}
-    out = subprocess.run(
-        [sys.executable, "-c", "from onboarding.llm import client; print(client.LLM_TIMEOUT)"],
-        env=env, capture_output=True, text=True, check=True,
-    )
-    assert out.stdout.strip() == "6.0"
+    env = {**os.environ, "LLM_TIMEOUT": value, "LLM_BUDGET": value, "LLM_BUDGET_WINDOW": value,
+           "PYTHONPATH": str(SRC)}
+    code = "from onboarding.llm import client as c; print(c.LLM_TIMEOUT, c.LLM_BUDGET, c.LLM_BUDGET_WINDOW)"
+    out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True)
+    assert out.stdout.split() == ["6.0", "15.0", "29.0"]

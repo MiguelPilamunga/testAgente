@@ -25,15 +25,15 @@
                                "APROBADO" no altera status/decision (REJECTED x2, ESCALATED, APPROVED_WITH_CONDITIONS),
                                ni en memoria ni persistido.
 
-- tests/test_llm_budget.py     (11) reloj falso inyectado: presupuesto agotado → None sin llamar clientes y
+- tests/test_llm_budget.py     (23) reloj falso inyectado: presupuesto agotado → None sin llamar clientes y
                                last_provider=="template"; el presupuesto se revisa antes de cada proveedor de fallback;
                                llamadas fallidas también consumen presupuesto; tras la ventana de 29 s se recupera y
                                dentro de ella no; defaults LLM_BUDGET+LLM_TIMEOUT < 29 s; _float_env inválido ("abc",
                                "", "6s") → default; LLM_TIMEOUT inválido al importar → 6.0 (subproceso limpio).
 
 ## Verificación
-    uv run pytest -q          → 105 passed (suite completa, incl. test_auth.py de otra sesión)
-    uv run ruff check tests src/onboarding/agents → All checks passed
+    uv run pytest -q          → 117 passed (suite completa, incl. test_auth.py de otra sesión)
+    uv run ruff check tests src/onboarding/agents src/onboarding/llm → All checks passed
 
 ## Observaciones vs SPEC (no se tocó src/)
 - Durante la implementación en paralelo hubo un fallo transitorio en test_resolve_approve_resumes_to_approved
@@ -62,9 +62,9 @@
   Contrato del SPEC sin cambios (internal_proposal vive dentro de steps, que es libre).
   test_mitigation_llm_text_does_not_leak_into_rejection_message ya pasa (xfail retirado).
 
-- OBSERVACIÓN (llm/client.py, no tocado): _float_env acepta "nan", "inf", "0" y negativos. LLM_TIMEOUT=inf rompe
-  la garantía de 29 s; LLM_BUDGET=nan desactiva el presupuesto en silencio (spent() >= nan siempre es False).
-  Sugerencia: aceptar solo valores finitos y > 0 (math.isfinite(v) and v > 0), si no → default.
+- APLICADO (alcance ampliado por el orquestador SOLO a _float_env en src/onboarding/llm/client.py):
+  _float_env acepta únicamente math.isfinite(v) and v > 0; si no, usa el default. Cubierto con nan, NaN, inf,
+  -inf, -1, 0, 0.0 y -0.5, y al importar (subproceso) para LLM_TIMEOUT/LLM_BUDGET/LLM_BUDGET_WINDOW → 6/15/29.
 
 ## Pendientes
 - Test de DynamoDBStore (moto) y del handler Mangum (warning DeprecationWarning de asyncio en mangum).
