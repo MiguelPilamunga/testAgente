@@ -76,45 +76,72 @@ curl -s -X POST $API/api/v1/onboarding/$ID/resolve -H 'Content-Type: application
 
 ## Desplegar en AWS (SAM)
 
-API Gateway HTTP API (JWT authorizer de Cognito) → Lambda Python 3.12 (FastAPI + Mangum) → DynamoDB;
-keys en Secrets Manager; logs, trazas y alarma en CloudWatch. Plantilla: [`infra/template.yaml`](infra/template.yaml).
+API Gateway HTTP API (JWT authorizer de Cognito) → Lambda Python 3.12 (FastAPI + Mangum) → DynamoDB (TTL);
+keys LLM en Secrets Manager; logs, X-Ray, dashboard, 9 alarmas y tópico SNS en CloudWatch.
+Plantilla: [`infra/template.yaml`](infra/template.yaml).
+
+### Despliegue actual (dev)
+
+| Output | Valor |
+|---|---|
+| Stack | `onboarding-agent-dev` · cuenta `774305616818` · `us-east-1` |
+| `ApiUrl` | https://o8pjot00p9.execute-api.us-east-1.amazonaws.com |
+| `UserPoolId` | `us-east-1_IwM4C49Lr` |
+| `UserPoolClientId` | `2s24fcilu3lekvoip4tq4ue7cf` |
+| `StateTableName` | `onboarding-agent-dev-state` |
+| `FunctionName` | `onboarding-agent-dev-orchestrator` |
+| `AlarmTopicArn` | `arn:aws:sns:us-east-1:774305616818:onboarding-agent-dev-alarms` |
+| Dashboard | [`onboarding-agent-dev-ops`](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards:name=onboarding-agent-dev-ops) |
+| Secreto LLM | `onboarding-agent/llm-keys` (hoy con valores vacíos ⇒ modo plantilla) |
+
+Las keys LLM se cargan sin tocar el repo:
+`aws secretsmanager put-secret-value --secret-id onboarding-agent/llm-keys --secret-string file://<json-local>`.
+
+### Cómo desplegar (manual, sin CI/CD, nunca con root)
 
 ```bash
-# 1) (opcional) crear el secreto con las keys LLM — nunca en el repo
-aws secretsmanager create-secret --name onboarding/llm \
-  --secret-string '{"ANTHROPIC_API_KEY":"...","OPENAI_API_KEY":"..."}'
+# 0) Una sola vez, con credenciales de administrador: boundary + usuario onboarding-deployer + perfil local
+ADMIN_PROFILE=default infra/bootstrap/create-deployer.sh          # ADR-0007
 
-# 2) gate local obligatorio: skill `verify` en PASS (en Claude Code: "verifica")
-# 3) validar, construir y desplegar (perfil AWS ecopacific)
+# 1) Gate local obligatorio: skill `verify` en PASS (en Claude Code: "verifica")
+# 2) Validar, construir y desplegar con el perfil acotado
 sam validate --lint -t infra/template.yaml
-sam build -t infra/template.yaml && sam deploy --guided --profile ecopacific
-#    en --guided: stack onboarding-agent, Stage=dev, LlmSecretArn=<ARN del paso 1 o vacío>,
-#    capabilities CAPABILITY_IAM; guarda la config en samconfig.toml (ignorado por git)
+sam build -t infra/template.yaml
+sam deploy --template-file .aws-sam/build/template.yaml --profile onboarding-deployer --region us-east-1 \
+  --stack-name onboarding-agent-dev --resolve-s3 --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+  --no-confirm-changeset --tags project=onboarding-agent \
+  --parameter-overrides Stage=dev LlmSecretArn=<ARN de onboarding-agent/llm-keys> [AlarmEmail=<email>]
 ```
 
-**Sin CI/CD** ([ADR-0005](docs/adr/0005-sin-ci-cd.md)): no hay GitHub Actions ni pipelines; el despliegue es
-manual y el skill `verify` es el gate obligatorio antes de integrar o desplegar. El perfil `personal` tiene
-credenciales inválidas (pendiente); usar `ecopacific`.
+- **Sin CI/CD** ([ADR-0005](docs/adr/0005-sin-ci-cd.md)): despliegue manual; `verify` es el gate obligatorio.
+- **IAM** ([ADR-0007](docs/adr/0007-iam-deployer-boundary.md)): `onboarding-deployer` solo opera recursos
+  `onboarding-agent-*` o con tag `project=onboarding-agent`. Todo rol lleva el boundary `onboarding-agent-boundary`.
+  El tag `--tags project=onboarding-agent` es obligatorio.
+- Un create fallido deja la tabla retenida (`DeletionPolicy: Retain`): bórrala antes de reintentar.
 
-Sin `LlmSecretArn` el stack se despliega en modo determinista (`LLM_PROVIDER=none`).
+### Autenticación y usuarios de prueba
 
-### Autenticación en AWS
-
-Todas las rutas salvo `/health` exigen un JWT de Cognito; `/resolve` además exige el grupo `compliance`
+Todas las rutas salvo `/health` exigen un JWT de Cognito; `/resolve` exige además el grupo `compliance`
 ([ADR-0004](docs/adr/0004-autenticacion.md)). En local no hay autenticación.
 
-```bash
-POOL=<UserPoolId>; CLIENT=<UserPoolClientId>      # outputs del stack
-aws cognito-idp admin-create-user --user-pool-id $POOL --username oficial1 --message-action SUPPRESS
-aws cognito-idp admin-set-user-password --user-pool-id $POOL --username oficial1 --password '<Password-Fuerte-1!>' --permanent
-aws cognito-idp admin-add-user-to-group --user-pool-id $POOL --username oficial1 --group-name compliance
-TOKEN=$(aws cognito-idp initiate-auth --client-id $CLIENT --auth-flow USER_PASSWORD_AUTH \
-  --auth-parameters USERNAME=oficial1,PASSWORD='<Password-Fuerte-1!>' --query AuthenticationResult.IdToken --output text)
+| Perfil | Usuario | Grupo | `start`/`get` | `resolve` |
+|---|---|---|---|---|
+| Canal digital | `canal-digital@test.onboarding` | — | 200 | 403 |
+| Oficial de cumplimiento | `oficial-cumplimiento@test.onboarding` | `compliance` | 200 | 200 |
 
-API=<ApiUrl>
-curl -s -X POST $API/api/v1/onboarding/start -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+```bash
+infra/bootstrap/seed-test-users.sh                 # idempotente; passwords solo en Secrets Manager onboarding-agent/test-users
+export AUTH_TOKEN=$(infra/bootstrap/get-token.sh oficial)   # o: canal  (imprime solo el IdToken)
+
+API=https://o8pjot00p9.execute-api.us-east-1.amazonaws.com
+curl -s -X POST $API/api/v1/onboarding/start -H "Authorization: Bearer $AUTH_TOKEN" -H 'Content-Type: application/json' \
   -d '{"prospect_name":"Ana Pérez","document_id":"1712345678","product":"cuenta_ahorros"}'
+
+AUTH_TOKEN=$AUTH_TOKEN .claude/skills/verify/scripts/smoke.sh $API   # smoke remoto: 17/17
 ```
+
+Postman: `postman/aws.postman_environment.json` ya trae `base_url`. Los tokens (`token_channel`, `token_officer`)
+se pegan localmente desde `get-token.sh` y nunca se commitean.
 
 ## Sesiones paralelas de Claude Code
 

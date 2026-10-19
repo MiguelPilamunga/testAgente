@@ -1,0 +1,232 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Identity",
+      "Effect": "Allow",
+      "Action": "sts:GetCallerIdentity",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFormationStacks",
+      "Effect": "Allow",
+      "Action": "cloudformation:*",
+      "Resource": [
+        "arn:aws:cloudformation:us-east-1:774305616818:stack/onboarding-agent-*/*",
+        "arn:aws:cloudformation:us-east-1:774305616818:stack/aws-sam-cli-managed-default/*",
+        "arn:aws:cloudformation:us-east-1:aws:transform/Serverless-2016-10-31"
+      ]
+    },
+    {
+      "Sid": "CloudFormationNoResourceLevel",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:ValidateTemplate",
+        "cloudformation:GetTemplateSummary",
+        "cloudformation:ListStacks"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SamArtifactsBucket",
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::aws-sam-cli-managed-default-*"
+      ]
+    },
+    {
+      "Sid": "Lambda",
+      "Effect": "Allow",
+      "Action": "lambda:*",
+      "Resource": "arn:aws:lambda:us-east-1:774305616818:function:onboarding-agent-*"
+    },
+    {
+      "Sid": "ApiGatewayCreateTaggedApi",
+      "Effect": "Allow",
+      "Action": "apigateway:POST",
+      "Resource": "arn:aws:apigateway:us-east-1::/apis",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/project": "onboarding-agent"
+        }
+      }
+    },
+    {
+      "Sid": "ApiGatewayListAndImport",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET",
+        "apigateway:PUT"
+      ],
+      "Resource": "arn:aws:apigateway:us-east-1::/apis"
+    },
+    {
+      "Sid": "ApiGatewayProjectApisOnly",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET",
+        "apigateway:POST",
+        "apigateway:PUT",
+        "apigateway:PATCH",
+        "apigateway:DELETE"
+      ],
+      "Resource": [
+        "arn:aws:apigateway:us-east-1::/apis/*",
+        "arn:aws:apigateway:us-east-1::/tags/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/project": "onboarding-agent"
+        }
+      }
+    },
+    {
+      "Sid": "ApiGatewayTagWithProjectTag",
+      "Effect": "Allow",
+      "Action": "apigateway:TagResource",
+      "Resource": [
+        "arn:aws:apigateway:us-east-1::/apis/*",
+        "arn:aws:apigateway:us-east-1::/tags/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/project": "onboarding-agent"
+        }
+      }
+    },
+    {
+      "Sid": "DynamoDB",
+      "Effect": "Allow",
+      "Action": "dynamodb:*",
+      "Resource": "arn:aws:dynamodb:us-east-1:774305616818:table/onboarding-agent-*"
+    },
+    {
+      "Sid": "CognitoCreateTaggedPool",
+      "Effect": "Allow",
+      "Action": "cognito-idp:CreateUserPool",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/project": "onboarding-agent"
+        }
+      }
+    },
+    {
+      "Sid": "CognitoListPools",
+      "Effect": "Allow",
+      "Action": "cognito-idp:ListUserPools",
+      "Resource": "*"
+    },
+    {
+      "Sid": "CognitoProjectPools",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:UpdateUserPool",
+        "cognito-idp:DeleteUserPool",
+        "cognito-idp:GetUserPoolMfaConfig",
+        "cognito-idp:SetUserPoolMfaConfig",
+        "cognito-idp:CreateUserPoolClient",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:UpdateUserPoolClient",
+        "cognito-idp:DeleteUserPoolClient",
+        "cognito-idp:CreateGroup",
+        "cognito-idp:GetGroup",
+        "cognito-idp:UpdateGroup",
+        "cognito-idp:DeleteGroup",
+        "cognito-idp:TagResource",
+        "cognito-idp:UntagResource",
+        "cognito-idp:ListTagsForResource",
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:AdminAddUserToGroup",
+        "cognito-idp:AdminRemoveUserFromGroup"
+      ],
+      "Resource": "arn:aws:cognito-idp:us-east-1:774305616818:userpool/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/project": "onboarding-agent"
+        }
+      }
+    },
+    {
+      "Sid": "LogGroups",
+      "Effect": "Allow",
+      "Action": "logs:*",
+      "Resource": [
+        "arn:aws:logs:us-east-1:774305616818:log-group:/aws/lambda/onboarding-agent-*",
+        "arn:aws:logs:us-east-1:774305616818:log-group:/aws/http-api/onboarding-agent-*"
+      ]
+    },
+    {
+      "Sid": "LogsNoResourceLevelForHttpApiAccessLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogGroups",
+        "logs:CreateLogDelivery",
+        "logs:GetLogDelivery",
+        "logs:UpdateLogDelivery",
+        "logs:DeleteLogDelivery",
+        "logs:ListLogDeliveries",
+        "logs:PutResourcePolicy",
+        "logs:DescribeResourcePolicies"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AlarmsAndDashboard",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DeleteAlarms",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:TagResource",
+        "cloudwatch:UntagResource",
+        "cloudwatch:ListTagsForResource",
+        "cloudwatch:PutDashboard",
+        "cloudwatch:GetDashboard",
+        "cloudwatch:DeleteDashboards"
+      ],
+      "Resource": [
+        "arn:aws:cloudwatch:us-east-1:774305616818:alarm:onboarding-agent-*",
+        "arn:aws:cloudwatch::774305616818:dashboard/onboarding-agent-*"
+      ]
+    },
+    {
+      "Sid": "AlarmTopic",
+      "Effect": "Allow",
+      "Action": [
+        "sns:CreateTopic",
+        "sns:DeleteTopic",
+        "sns:GetTopicAttributes",
+        "sns:SetTopicAttributes",
+        "sns:Subscribe",
+        "sns:Unsubscribe",
+        "sns:ListSubscriptionsByTopic",
+        "sns:TagResource",
+        "sns:UntagResource",
+        "sns:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:sns:us-east-1:774305616818:onboarding-agent-*"
+    },
+    {
+      "Sid": "ProjectSecrets",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:CreateSecret",
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:PutSecretValue",
+        "secretsmanager:TagResource"
+      ],
+      "Resource": "arn:aws:secretsmanager:us-east-1:774305616818:secret:onboarding-agent/*"
+    },
+    {
+      "Sid": "ReadTestUsersSecretOnly",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:us-east-1:774305616818:secret:onboarding-agent/test-users-*"
+    }
+  ]
+}

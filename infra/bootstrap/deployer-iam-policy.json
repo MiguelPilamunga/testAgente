@@ -1,0 +1,130 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RoleReadAndTag",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:DeleteRole"
+      ],
+      "Resource": "arn:aws:iam::774305616818:role/onboarding-agent-*"
+    },
+    {
+      "Sid": "RoleWriteOnlyWithBoundary",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy"
+      ],
+      "Resource": "arn:aws:iam::774305616818:role/onboarding-agent-*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::774305616818:policy/onboarding-agent-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "AttachOnlyLambdaBasicAndXRay",
+      "Effect": "Allow",
+      "Action": [
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy"
+      ],
+      "Resource": "arn:aws:iam::774305616818:role/onboarding-agent-*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::774305616818:policy/onboarding-agent-boundary"
+        },
+        "ArnEquals": {
+          "iam:PolicyARN": [
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+            "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "PassRoleOnlyToLambda",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::774305616818:role/onboarding-agent-*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "lambda.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "DenyBoundaryRemovalOrSwap",
+      "Effect": "Deny",
+      "Action": "iam:DeleteRolePermissionsBoundary",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyPutOtherBoundary",
+      "Effect": "Deny",
+      "Action": "iam:PutRolePermissionsBoundary",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::774305616818:policy/onboarding-agent-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "DenyBoundaryTampering",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreatePolicyVersion",
+        "iam:SetDefaultPolicyVersion",
+        "iam:DeletePolicy",
+        "iam:DeletePolicyVersion"
+      ],
+      "Resource": [
+        "arn:aws:iam::774305616818:policy/onboarding-agent-boundary",
+        "arn:aws:iam::774305616818:policy/onboarding-agent-deployer",
+        "arn:aws:iam::774305616818:policy/onboarding-agent-deployer-iam"
+      ]
+    },
+    {
+      "Sid": "DenyIdentityCreation",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateUser",
+        "iam:AttachUserPolicy",
+        "iam:PutUserPolicy",
+        "iam:CreateAccessKey",
+        "iam:CreateLoginProfile",
+        "iam:UpdateAssumeRolePolicy"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyFunctionUrls",
+      "Effect": "Deny",
+      "Action": [
+        "lambda:CreateFunctionUrlConfig",
+        "lambda:UpdateFunctionUrlConfig"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyInvokePermissionExceptApiGateway",
+      "Effect": "Deny",
+      "Action": "lambda:AddPermission",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "lambda:Principal": "apigateway.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

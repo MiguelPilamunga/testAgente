@@ -54,3 +54,27 @@
 - docs/adr/0006-privacidad-y-retencion.md; nota en ARCHITECTURE §5.
 - Verificado: uv run pytest -q → 126 passed; ruff check src tests OK; sam validate --lint OK.
 - Pendiente: prompts al LLM aún pueden incluir nombre completo (agents/ fuera de alcance).
+
+## Iteración 4 — Deploy AWS (cuenta 774305616818, us-east-1) — CREATE_COMPLETE
+- Bootstrap (root SOLO para IAM): infra/bootstrap/create-deployer.sh. Crea el boundary onboarding-agent-boundary,
+  las políticas administradas onboarding-agent-deployer (recursos) y onboarding-agent-deployer-iam (roles con
+  boundary, PassRole a lambda, denies), y el usuario y perfil onboarding-deployer. La key no se imprimió.
+  Access Analyzer: 0 hallazgos de seguridad.
+- Cognito y API Gateway acotados por tag project=onboarding-agent. Deny de Function URLs y de AddPermission que
+  no sea de apigateway. ADR-0007 corregido.
+- Secreto onboarding-agent/llm-keys con valores vacíos (app en modo plantilla).
+- Template: PermissionsBoundary global, tags, SNS ${Stack}-alarms + AlarmEmail opcional, dashboard ${Stack}-ops
+  (8 widgets), 8 alarmas de docs/METRICAS.md + alarma de errores de la Lambda.
+- Outputs: ApiUrl https://o8pjot00p9.execute-api.us-east-1.amazonaws.com · UserPoolId us-east-1_IwM4C49Lr ·
+  ClientId 2s24fcilu3lekvoip4tq4ue7cf · tabla onboarding-agent-dev-state · topic onboarding-agent-dev-alarms.
+- Usuarios: infra/bootstrap/seed-test-users.sh (canal sin grupo, oficial en compliance; passwords solo en
+  onboarding-agent/test-users) + get-token.sh.
+- Verificado: smoke remoto con token de oficial 17/17 PASS. Manual con token de canal: start 200 ESCALATED,
+  get 200, resolve 403; con token de oficial, resolve → APPROVED. Sin token → 401.
+- postman/aws.postman_environment.json: base_url actualizado (sin tokens). README: outputs, despliegue, tokens.
+## Pendientes
+- Borrar o rotar la access key de onboarding-deployer al terminar la evaluación (root).
+- Activar IAM Access Analyzer de acceso externo: decisión del usuario (cuenta compartida).
+- Cargar keys LLM nuevas en onboarding-agent/llm-keys (las pegadas en el chat están comprometidas).
+- docs/METRICAS.md cita el log group /aws/lambda/onboarding-agent-orchestrator; el real es
+  /aws/lambda/onboarding-agent-dev-orchestrator.

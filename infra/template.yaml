@@ -1,5 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
+# Nombres con prefijo ${AWS::StackName} (onboarding-agent-<stage>) => la política del deployer se acota a onboarding-agent-*.
 Description: >
   Agente Orquestador de Onboarding Digital — API Gateway (HTTP API) -> Lambda (FastAPI + Mangum)
   -> DynamoDB. Keys LLM en Secrets Manager.
@@ -41,9 +42,14 @@ Parameters:
   LogRetentionDays:
     Type: Number
     Default: 30
+  AlarmEmail:
+    Type: String
+    Default: ""
+    Description: Email suscrito al tópico de alarmas (opcional; vacío = sin suscripción)
 
 Conditions:
   HasLlmSecret: !Not [!Equals [!Ref LlmSecretArn, ""]]
+  HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, ""]]
 
 Globals:
   Function:
@@ -52,11 +58,15 @@ Globals:
     MemorySize: 512
     Timeout: 29 # = límite de integración de API Gateway; el LLM cabe por LLM_TIMEOUT + LLM_BUDGET
     Tracing: Active
+    # Todo rol de función queda acotado por el boundary (ADR-0007): el deployer no puede crear roles sin él.
+    PermissionsBoundary: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/onboarding-agent-boundary
 
 Resources:
   OnboardingHttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
+      Tags:
+        project: onboarding-agent # la política del deployer exige este tag en /apis/* (ADR-0007)
       # $default => sin prefijo de stage en rawPath (las rutas FastAPI llegan tal cual vía Mangum)
       StageName: $default
       AccessLogSettings:
@@ -79,7 +89,9 @@ Resources:
   OnboardingUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: !Sub onboarding-${Stage}
+      UserPoolName: !Sub ${AWS::StackName}-users
+      UserPoolTags:
+        project: onboarding-agent
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
       MfaConfiguration: "OFF"
@@ -95,7 +107,7 @@ Resources:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       UserPoolId: !Ref OnboardingUserPool
-      ClientName: !Sub onboarding-channel-${Stage}
+      ClientName: !Sub ${AWS::StackName}-channel
       GenerateSecret: false
       ExplicitAuthFlows:
         - ALLOW_USER_SRP_AUTH
@@ -119,7 +131,7 @@ Resources:
   OnboardingFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub onboarding-orchestrator-${Stage}
+      FunctionName: !Sub ${AWS::StackName}-orchestrator
       CodeUri: ../src
       Handler: onboarding.api.handler
       Description: Orquestador multi-agente de onboarding (FastAPI + Mangum)
@@ -184,7 +196,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      TableName: !Sub onboarding-state-${Stage}
+      TableName: !Sub ${AWS::StackName}-state
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: onboarding_id
@@ -203,18 +215,256 @@ Resources:
   FunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub /aws/lambda/onboarding-orchestrator-${Stage}
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-orchestrator
       RetentionInDays: !Ref LogRetentionDays
 
   ApiAccessLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub /aws/http-api/onboarding-${Stage}
+      LogGroupName: !Sub /aws/http-api/${AWS::StackName}
       RetentionInDays: !Ref LogRetentionDays
+
+  # ---- Observabilidad: SNS + dashboard + alarmas de negocio/seguridad (docs/METRICAS.md) -------------
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub ${AWS::StackName}-alarms
+
+  AlarmEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlarmEmail
+    Properties:
+      TopicArn: !Ref AlarmTopic
+      Protocol: email
+      Endpoint: !Ref AlarmEmail
+
+  OpsDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub ${AWS::StackName}-ops
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {"type": "metric", "x": 0, "y": 0, "width": 8, "height": 6, "properties": {
+              "title": "KPIs de decisión automática (%)", "region": "${AWS::Region}", "view": "timeSeries",
+              "stat": "Sum", "period": 3600, "yAxis": {"left": {"min": 0, "max": 100}},
+              "metrics": [
+                ["OnboardingAgent", "OnboardingStarted", {"id": "started", "visible": false}],
+                ["OnboardingAgent", "OnboardingDecision", "Source", "start", "Status", "APPROVED", {"id": "ap", "visible": false}],
+                ["OnboardingAgent", "OnboardingDecision", "Source", "start", "Status", "APPROVED_WITH_CONDITIONS", {"id": "awc", "visible": false}],
+                ["OnboardingAgent", "OnboardingDecision", "Source", "start", "Status", "ESCALATED", {"id": "esc", "visible": false}],
+                ["OnboardingAgent", "OnboardingDecision", "Source", "start", "Status", "REJECTED", {"id": "rej", "visible": false}],
+                [{"expression": "100 * (ap + awc) / started", "label": "Aprobación automática %", "id": "kpi_ap"}],
+                [{"expression": "100 * esc / started", "label": "Escalamiento %", "id": "kpi_esc"}],
+                [{"expression": "100 * rej / started", "label": "Rechazo %", "id": "kpi_rej"}]
+              ]}},
+            {"type": "metric", "x": 8, "y": 0, "width": 8, "height": 6, "properties": {
+              "title": "Solicitudes por producto", "region": "${AWS::Region}", "view": "timeSeries", "stacked": true,
+              "stat": "Sum", "period": 300,
+              "metrics": [
+                ["OnboardingAgent", "OnboardingStarted", "Product", "cuenta_ahorros"],
+                ["OnboardingAgent", "OnboardingStarted", "Product", "cuenta_corriente"],
+                ["OnboardingAgent", "OnboardingStarted", "Product", "tarjeta_credito"],
+                ["OnboardingAgent", "OnboardingStarted", "Product", "unknown"]
+              ]}},
+            {"type": "metric", "x": 16, "y": 0, "width": 8, "height": 6, "properties": {
+              "title": "Escalamientos por paso/severidad", "region": "${AWS::Region}", "view": "timeSeries", "stacked": true,
+              "stat": "Sum", "period": 300,
+              "metrics": [
+                ["OnboardingAgent", "Escalations", "Severity", "medium", "Step", "identity"],
+                ["OnboardingAgent", "Escalations", "Severity", "high", "Step", "risk"],
+                ["OnboardingAgent", "Escalations", "Severity", "high", "Step", "identity"],
+                ["OnboardingAgent", "Escalations", "Severity", "medium", "Step", "risk"],
+                ["OnboardingAgent", "Escalations", "Severity", "medium", "Step", "documentation"]
+              ]}},
+            {"type": "metric", "x": 0, "y": 6, "width": 8, "height": 6, "properties": {
+              "title": "Latencia por paso p95 (ms)", "region": "${AWS::Region}", "view": "timeSeries",
+              "stat": "p95", "period": 300,
+              "metrics": [
+                ["OnboardingAgent", "StepLatencyMs", "Step", "identity"],
+                ["OnboardingAgent", "StepLatencyMs", "Step", "risk"],
+                ["OnboardingAgent", "StepLatencyMs", "Step", "documentation"],
+                ["OnboardingAgent", "StepLatencyMs", "Step", "decision"],
+                ["OnboardingAgent", "StepLatencyMs", "Step", "response"],
+                ["OnboardingAgent", "EndToEndLatencyMs", "Source", "start", {"label": "End-to-end (start)"}]
+              ],
+              "annotations": {"horizontal": [{"label": "Timeout API GW", "value": 29000}]}}},
+            {"type": "metric", "x": 8, "y": 6, "width": 8, "height": 6, "properties": {
+              "title": "Tools: llamadas, errores, reintentos, denegadas", "region": "${AWS::Region}", "view": "timeSeries",
+              "stat": "Sum", "period": 300,
+              "metrics": [
+                ["OnboardingAgent", "ToolCalls"],
+                ["OnboardingAgent", "ToolErrors"],
+                ["OnboardingAgent", "ToolRetries"],
+                ["OnboardingAgent", "ToolDenied", {"color": "#d62728"}]
+              ]}},
+            {"type": "metric", "x": 16, "y": 6, "width": 8, "height": 6, "properties": {
+              "title": "LLM: proveedor, fallback y guardrail", "region": "${AWS::Region}", "view": "timeSeries",
+              "stat": "Sum", "period": 300,
+              "metrics": [
+                ["OnboardingAgent", "LLMCalls", "Provider", "anthropic"],
+                ["OnboardingAgent", "LLMCalls", "Provider", "openai"],
+                ["OnboardingAgent", "LLMCalls", "Provider", "template"],
+                ["OnboardingAgent", "LLMFallbacks"],
+                ["OnboardingAgent", "LLMOutputRejected"],
+                ["OnboardingAgent", "LLMBudgetExhausted"]
+              ]}},
+            {"type": "metric", "x": 0, "y": 12, "width": 12, "height": 6, "properties": {
+              "title": "Tiempo a resolución p50/p90 (h)", "region": "${AWS::Region}", "view": "timeSeries", "period": 3600,
+              "metrics": [
+                ["OnboardingAgent", "TimeToResolveSeconds", {"id": "p50", "stat": "p50", "visible": false}],
+                ["OnboardingAgent", "TimeToResolveSeconds", {"id": "p90", "stat": "p90", "visible": false}],
+                [{"expression": "p50 / 3600", "label": "p50 (h)"}],
+                [{"expression": "p90 / 3600", "label": "p90 (h)"}]
+              ],
+              "annotations": {"horizontal": [{"label": "SLA 48 h", "value": 48}]}}},
+            {"type": "metric", "x": 12, "y": 12, "width": 12, "height": 6, "properties": {
+              "title": "Resoluciones de oficiales", "region": "${AWS::Region}", "view": "bar", "stat": "Sum", "period": 86400,
+              "metrics": [
+                ["OnboardingAgent", "EscalationResolved", "Action", "approve"],
+                ["OnboardingAgent", "EscalationResolved", "Action", "reject"],
+                ["OnboardingAgent", "EscalationResolved", "Action", "retry"]
+              ]}}
+          ]
+        }
+
+  AlarmToolDenied:            # seguridad: violación de allowlist
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-tool-denied
+      AlarmDescription: Un agente intentó usar una tool fuera de su allowlist (crítica)
+      Namespace: OnboardingAgent
+      MetricName: ToolDenied
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  AlarmToolErrors:            # servicio externo caído
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-tool-errors
+      Namespace: OnboardingAgent
+      MetricName: ToolErrors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  AlarmLLMOutputRejected:     # el LLM intenta contradecir la decisión
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-llm-output-rejected
+      Namespace: OnboardingAgent
+      MetricName: LLMOutputRejected
+      Statistic: Sum
+      Period: 900
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  AlarmLLMBudgetExhausted:    # proveedor LLM lento
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-llm-budget-exhausted
+      Namespace: OnboardingAgent
+      MetricName: LLMBudgetExhausted
+      Statistic: Sum
+      Period: 900
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  AlarmEndToEndLatency:       # cerca del timeout de 29 s
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-e2e-latency-p95
+      Namespace: OnboardingAgent
+      MetricName: EndToEndLatencyMs
+      Dimensions: [{Name: Source, Value: start}]
+      ExtendedStatistic: p95
+      Period: 900
+      EvaluationPeriods: 1
+      Threshold: 20000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  AlarmTimeToResolve:         # SLA 48 h comunicado al cliente
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-time-to-resolve-p90
+      Namespace: OnboardingAgent
+      MetricName: TimeToResolveSeconds
+      ExtendedStatistic: p90
+      Period: 86400
+      EvaluationPeriods: 1
+      Threshold: 172800
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  AlarmEscalationRate:        # > 30 % de solicitudes escaladas en 1 h (mínimo 10 solicitudes)
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-escalation-rate
+      EvaluationPeriods: 1
+      Threshold: 30
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      Metrics:
+        - Id: started
+          ReturnData: false
+          MetricStat: {Metric: {Namespace: OnboardingAgent, MetricName: OnboardingStarted}, Period: 3600, Stat: Sum}
+        - Id: esc
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: OnboardingAgent
+              MetricName: OnboardingDecision
+              Dimensions: [{Name: Source, Value: start}, {Name: Status, Value: ESCALATED}]
+            Period: 3600
+            Stat: Sum
+        - Id: rate
+          Expression: IF(started >= 10, 100 * esc / started, 0)
+          Label: Escalamiento %
+
+  AlarmLLMFallbackRate:       # > 20 % de textos no vienen del proveedor primario
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-llm-fallback-rate
+      EvaluationPeriods: 1
+      Threshold: 20
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      Metrics:
+        - Id: calls
+          ReturnData: false
+          MetricStat: {Metric: {Namespace: OnboardingAgent, MetricName: LLMCalls}, Period: 3600, Stat: Sum}
+        - Id: fb
+          ReturnData: false
+          MetricStat: {Metric: {Namespace: OnboardingAgent, MetricName: LLMFallbacks}, Period: 3600, Stat: Sum}
+        - Id: rate
+          Expression: IF(calls >= 10, 100 * fb / calls, 0)
+          Label: Fallback LLM %
 
   FunctionErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
+      AlarmName: !Sub ${AWS::StackName}-lambda-errors
+      AlarmActions: [!Ref AlarmTopic]
       AlarmDescription: Errores en la Lambda del orquestador de onboarding
       Namespace: AWS/Lambda
       MetricName: Errors
@@ -240,3 +490,7 @@ Outputs:
     Value: !Ref OnboardingFunction
   StateTableName:
     Value: !Ref OnboardingStateTable
+  AlarmTopicArn:
+    Value: !Ref AlarmTopic
+  DashboardUrl:
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${AWS::StackName}-ops

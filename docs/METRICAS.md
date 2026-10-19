@@ -62,7 +62,7 @@ Semántica fina:
 
 ## CloudWatch Logs Insights
 
-Log group: `/aws/lambda/onboarding-agent-orchestrator`.
+Log group: `/aws/lambda/onboarding-agent-dev-orchestrator`.
 
 ```sql
 -- Decisiones automáticas por estado y producto (últimas 24 h)

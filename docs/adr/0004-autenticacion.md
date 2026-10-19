@@ -28,3 +28,16 @@ Además `/{proxy+}` exponía cualquier ruta que la app llegara a definir.
 - ✅ El `sub`/`username` del token puede registrarse en `audit[]` como autor de la resolución.
 - ⚠️ La verificación del grupo depende de la app → requiere test (pendiente para la sesión de `api.py`).
 - ⚠️ Nuevas rutas deben declararse en la plantilla (fricción intencional, igual que el allowlist de tools).
+
+## Perfiles de prueba (deploy dev)
+`infra/bootstrap/seed-test-users.sh` crea dos usuarios en el User Pool del stack. Es idempotente y las passwords
+aleatorias solo se guardan en Secrets Manager `onboarding-agent/test-users`:
+
+| Usuario | Grupo | Representa | Esperado |
+|---|---|---|---|
+| `canal-digital@test.onboarding` | — | Canal digital del banco | `start`/`get` 200, `resolve` **403** |
+| `oficial-cumplimiento@test.onboarding` | `compliance` | Oficial de cumplimiento | `start`/`get`/`resolve` 200 |
+
+`infra/bootstrap/get-token.sh canal|oficial` imprime solo el **IdToken**, que lleva `cognito:groups` y
+`aud = ClientId`, lo que valida el JWT authorizer. La Lambda no puede leer `test-users`: su boundary solo permite
+`llm-keys` (ADR-0007).
