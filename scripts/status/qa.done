@@ -1,0 +1,37 @@
+# qa — DONE
+
+## Archivos creados (solo tests/)
+- tests/conftest.py            env LLM_PROVIDER=none, STATE_BACKEND=memory, sin keys/LLM_SECRET_ARN;
+                               fixture `orchestrator` fresco (InMemoryStore) inyectado en onboarding.api vía monkeypatch;
+                               fixture `client` = TestClient(onboarding.api:app).
+- tests/test_api.py            (27) health; 7 escenarios document_id→status; shape de respuesta; pausa en identity/risk;
+                               PEP añade docs; 0900000001 REJECTED + `proposals` (presencial/agencia); 422 (5 ids inválidos
+                               + campos faltantes); producto inexistente → REJECTED con alternativas en `proposals`;
+                               GET estado/404; resolve approve→APPROVED (persistido); reject→REJECTED; escalamiento
+                               inexistente 404/409; ya resuelto 404/409; onboarding inexistente 404; action inválida 422.
+- tests/test_tool_permissions.py (7) tool permitida audita tool_call/tool_result; 4 combinaciones no permitidas →
+                               ToolNotPermittedError + evento `tool_denied` y la tool NO se ejecuta; Response/Mitigation
+                               sin allowlist.
+- tests/test_orchestrator.py   (12) 0900000005: exactamente TOOL_MAX_ATTEMPTS=2 llamadas a verify_identity → ESCALATED
+                               con propuesta de retry; éxito sin reintento; resolve retry re-ejecuta el paso;
+                               propuestas en todo ESCALATED (escalations[*].proposal) / REJECTED (proposals);
+                               riesgo high nunca auto-aprobado; approve en risk continúa desde documentation sin
+                               re-ejecutar risk → APPROVED_WITH_CONDITIONS; decisión determinista + docs EDD.
+
+## Verificación
+    uv run pytest -q          → 46 passed (estable en 3 corridas)
+    uv run ruff check tests   → All checks passed
+
+## Observaciones vs SPEC (no se tocó src/)
+- Durante la implementación en paralelo hubo un fallo transitorio en test_resolve_approve_resumes_to_approved
+  (src cambiando); ahora estable.
+- models.Status incluye IN_PROGRESS, que no está en el enum de status del SPEC (estado interno; solo sería
+  visible si un flujo terminara sin decisión).
+- La respuesta incluye campos extra no listados en el SPEC (conversation, created_at, updated_at, resolution
+  en escalamientos). No rompe el contrato; considerar documentarlos.
+- 0900000005 + resolve retry: el mock siempre falla, por lo que se agrega un 2º escalamiento OPEN (comportamiento
+  esperado, documentado en el test).
+
+## Pendientes
+- Test del fallback LLM (anthropic → openai → plantilla) con clientes mockeados.
+- Test de DynamoDBStore (moto) y del handler Mangum (warning DeprecationWarning de asyncio en mangum).

@@ -31,7 +31,7 @@ Validación: `document_id` = 10 dígitos numéricos (422 si no). `product` ∈ p
 ```json
 {
   "onboarding_id": "uuid",
-  "status": "APPROVED | APPROVED_WITH_CONDITIONS | REJECTED | ESCALATED",
+  "status": "IN_PROGRESS (transitorio) | APPROVED | APPROVED_WITH_CONDITIONS | REJECTED | ESCALATED",
   "current_step": "identity | risk | documentation | decision | response | done",
   "decision": {"eligible": true, "reasons": ["..."]},
   "steps": {"identity": {...}, "risk": {...}, "documentation": {...}},
@@ -75,7 +75,7 @@ Cualquier llamada fuera del allowlist → `ToolNotPermittedError` + evento en au
 ## Máquina de estados del orquestador
 `identity → risk → documentation → decision → response → done`. Un escalamiento **pausa** el flujo
 (`status=ESCALATED`, `current_step` = paso pausado). `resolve` con `approve` continúa desde el siguiente paso;
-`retry` re-ejecuta el paso; `reject` termina en REJECTED. Estado persistido en `StateStore`
+`retry` re-ejecuta el paso (si vuelve a fallar se abre un escalamiento nuevo; el anterior queda RESOLVED); `reject` termina en REJECTED. Estado persistido en `StateStore`
 (memoria local / DynamoDB en AWS).
 
 ## Despliegue AWS
