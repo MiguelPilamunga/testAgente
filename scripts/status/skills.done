@@ -74,3 +74,15 @@ Pendiente de verificar con perfil admin: roles onboarding-agent-* sin boundary; 
 HIGH: Cognito cognito-idp:* en userpool/* => lateral a otros pools. AWS Service Reference (cognito-idp.json):
   userpool soporta aws:ResourceTag; CreateUserPool soporta aws:RequestTag/aws:TagKeys. Se envió política tag-scoped.
 No bloqueantes: Function URLs/AddPermission, tag-scope apigateway, Access Analyzer, guard ALLOW_INSECURE_LOCAL en Lambda.
+
+--- TAREA 6: revisión final IAM endurecida (1e6d09b, solo lectura) ---
+Veredicto: APROBADO, sin bloqueantes. Confirmado (AWS Service Reference lambda.json): AddPermission solo
+  admite lambda:FunctionUrlAuthType y lambda:Principal; no hay lambda:SourceArn.
+No bloqueantes enviados: Deny dynamodb PutResourcePolicy/Export/Restore (MEDIUM); requestContext.accountId
+  en auth.py contra confused deputy (LOW-MED, lo puedo implementar); logs PutSubscriptionFilter/DeleteLogGroup y
+  sns SetTopicAttributes (LOW); Sid apigateway:TagResource sin efecto (no es acción IAM).
+
+--- TAREA 7: anti confused-deputy en auth.py ---
+apigw: EXPECTED_ACCOUNT_ID ausente/vacío => 500; requestContext.accountId distinto/ausente => 403; luego sub+compliance.
+tests/test_auth.py: fixture local EXPECTED_ACCOUNT_ID + 7 casos. pytest 163 passed, ruff OK.
+Requiere en template: EXPECTED_ACCOUNT_ID: !Ref AWS::AccountId (mismo deploy) — avisado a arch.

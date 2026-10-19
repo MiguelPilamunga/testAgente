@@ -6,15 +6,24 @@ from fastapi.testclient import TestClient
 from onboarding.auth import _parse_groups
 
 START = "/api/v1/onboarding/start"
+ACCOUNT = "111122223333"
 
 
-def _client_with_claims(claims):
+@pytest.fixture(autouse=True)
+def _expected_account(monkeypatch):
+    monkeypatch.setenv("EXPECTED_ACCOUNT_ID", ACCOUNT)
+
+
+def _client_with_claims(claims, account=ACCOUNT):
     """Envuelve la app inyectando el evento de API Gateway en el scope, como hace Mangum."""
     from onboarding.api import app
 
     async def asgi(scope, receive, send):
         if claims is not None:
-            scope["aws.event"] = {"requestContext": {"authorizer": {"jwt": {"claims": claims}}}}
+            ctx = {"authorizer": {"jwt": {"claims": claims}}}
+            if account is not None:
+                ctx["accountId"] = account
+            scope["aws.event"] = {"requestContext": ctx}
         await app(scope, receive, send)
 
     return TestClient(asgi)
@@ -125,5 +134,39 @@ def test_apigw_en_lambda_sigue_funcionando(orchestrator, monkeypatch):
     monkeypatch.setenv("AWS_LAMBDA_FUNCTION_NAME", "onboarding-agent-orchestrator")
     monkeypatch.setenv("AUTH_MODE", "apigw")
     client = _client_with_claims({"sub": "officer-42", "cognito:groups": "[compliance]"})
+    oid, eid = _escalated(client)
+    assert _resolve(client, oid, eid).status_code == 200
+
+
+OFFICER = {"sub": "officer-42", "cognito:groups": "[compliance]"}
+
+
+@pytest.mark.parametrize("account", ["999988887777", "", None])
+def test_apigw_rechaza_evento_de_otra_cuenta(orchestrator, monkeypatch, account):
+    monkeypatch.setenv("AUTH_MODE", "apigw")
+    client = _client_with_claims(OFFICER, account=account)
+    oid, eid = _escalated(client)
+    resp = _resolve(client, oid, eid)
+    assert resp.status_code == 403
+    assert orchestrator.get(oid).status == "ESCALATED"
+
+
+@pytest.mark.parametrize("value", [None, "", "  "])
+def test_apigw_sin_expected_account_id_es_error_de_configuracion(orchestrator, monkeypatch, value):
+    monkeypatch.setenv("AUTH_MODE", "apigw")
+    if value is None:
+        monkeypatch.delenv("EXPECTED_ACCOUNT_ID", raising=False)
+    else:
+        monkeypatch.setenv("EXPECTED_ACCOUNT_ID", value)
+    client = _client_with_claims(OFFICER)
+    oid, eid = _escalated(client)
+    resp = _resolve(client, oid, eid)
+    assert resp.status_code == 500
+    assert orchestrator.get(oid).status == "ESCALATED"
+
+
+def test_auth_mode_none_local_no_exige_expected_account(orchestrator, monkeypatch):
+    monkeypatch.delenv("EXPECTED_ACCOUNT_ID", raising=False)
+    client = _client_with_claims(None)
     oid, eid = _escalated(client)
     assert _resolve(client, oid, eid).status_code == 200

@@ -4,6 +4,9 @@ El authorizer JWT de API Gateway ya valida el token; aquí se re-verifica la aut
 claims que Mangum expone en `request.scope["aws.event"]`. Fail-closed: AUTH_MODE ausente equivale a
 `apigw`; `none` (local/tests) solo se acepta si además ALLOW_INSECURE_LOCAL=1 y nunca dentro de Lambda
 (AWS_LAMBDA_FUNCTION_NAME), para que un cambio de variables de entorno no apague el check en AWS.
+En apigw el evento debe venir de un API Gateway de nuestra cuenta (`requestContext.accountId` ==
+EXPECTED_ACCOUNT_ID): IAM no permite fijar el SourceArn en lambda:AddPermission, así que un permiso de invocación
+mal dado a apigateway.amazonaws.com dejaría entrar al API Gateway (y al Cognito) de otra cuenta.
 """
 
 import os
@@ -29,9 +32,12 @@ def _parse_groups(raw: object) -> tuple[str, ...]:
     return ()
 
 
+def _request_context(request: Request) -> dict:
+    return (request.scope.get("aws.event") or {}).get("requestContext") or {}
+
+
 def _claims(request: Request) -> dict:
-    event = request.scope.get("aws.event") or {}
-    return (event.get("requestContext") or {}).get("authorizer", {}).get("jwt", {}).get("claims") or {}
+    return _request_context(request).get("authorizer", {}).get("jwt", {}).get("claims") or {}
 
 
 def require_compliance(request: Request) -> Officer | None:
@@ -44,6 +50,11 @@ def require_compliance(request: Request) -> Officer | None:
         raise HTTPException(403, "AUTH_MODE=none requiere ALLOW_INSECURE_LOCAL=1")
     if mode != "apigw":
         raise HTTPException(500, "invalid AUTH_MODE")
+    expected_account = os.getenv("EXPECTED_ACCOUNT_ID", "").strip()
+    if not expected_account:
+        raise HTTPException(500, "EXPECTED_ACCOUNT_ID no configurado")
+    if str(_request_context(request).get("accountId", "")) != expected_account:
+        raise HTTPException(403, "evento de API Gateway de una cuenta no autorizada")
     claims = _claims(request)
     groups = _parse_groups(claims.get("cognito:groups"))
     sub = claims.get("sub")
